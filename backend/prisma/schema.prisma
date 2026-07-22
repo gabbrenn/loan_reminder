@@ -1,0 +1,180 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  LOAN_OFFICER
+  CREDIT_MANAGER
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID
+  OVERDUE
+  DEFAULTED
+}
+
+enum RepaymentFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum ReminderType {
+  BEFORE_7_DAYS
+  BEFORE_3_DAYS
+  BEFORE_1_DAY
+  OVERDUE
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         Role
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  loans        Loan[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Borrower {
+  id             String   @id @default(uuid())
+  fullName       String
+  nationalId     String   @unique
+  phone          String   @unique
+  email          String   @unique
+  address        String
+  occupation     String
+  guarantorName  String
+  guarantorPhone String
+  photo          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  loans          Loan[]
+
+  @@map("borrowers")
+}
+
+model Loan {
+  id               String             @id @default(uuid())
+  loanNumber       String             @unique
+  borrowerId       String
+  borrower         Borrower           @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  createdById      String?
+  createdBy        User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  principalAmount  Float
+  interestRate     Float
+  totalPayable     Float
+  remainingBalance Float
+  loanDate         DateTime
+  dueDate          DateTime
+  frequency        RepaymentFrequency
+  status           LoanStatus         @default(ACTIVE)
+  purpose          String?
+  gracePeriodDays  Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  repaymentSchedules RepaymentSchedule[]
+  repayments         LoanRepayment[]
+
+  @@map("loans")
+}
+
+model LoanRepayment {
+  id            String        @id @default(uuid())
+  loanId        String
+  loan          Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentDate   DateTime
+  paymentMethod PaymentMethod @default(CASH)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("loan_repayments")
+}
+
+model RepaymentSchedule {
+  id                String            @id @default(uuid())
+  loanId            String
+  loan              Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  installmentNumber Int
+  dueDate           DateTime
+  amountDue         Float
+  amountPaid        Float             @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  notificationLogs  NotificationLog[]
+
+  @@map("repayment_schedules")
+}
+
+model NotificationLog {
+  id                  String              @id @default(uuid())
+  repaymentScheduleId String
+  repaymentSchedule   RepaymentSchedule   @relation(fields: [repaymentScheduleId], references: [id], onDelete: Cascade)
+  reminderType        ReminderType
+  channel             NotificationChannel
+  status              NotificationStatus  @default(PENDING)
+  message             String?
+  sentAt              DateTime            @default(now())
+  errorMessage        String?
+
+  @@map("notification_logs")
+}
+
+model SystemSetting {
+  id                  String   @id @default(uuid())
+  reminderDaysBefore1 Int      @default(7)
+  reminderDaysBefore2 Int      @default(3)
+  reminderDaysBefore3 Int      @default(1)
+  smsEnabled          Boolean  @default(true)
+  emailEnabled        Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

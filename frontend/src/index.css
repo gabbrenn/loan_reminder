@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode — `.dark` on <html> triggers dark: variants */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Smooth theme transition */
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
+  /* Disable transition on svg paths to prevent flicker */
+  svg * {
+    transition: none;
+  }
+}
