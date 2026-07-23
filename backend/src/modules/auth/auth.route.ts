@@ -55,4 +55,22 @@ export async function authRoutes(fastify: FastifyInstance) {
     },
     controller.changePassword as any
   );
+
+  // Update Profile route (e.g. update own email/name)
+  fastify.patch(
+    '/profile',
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            email: { type: 'string', format: 'email' },
+            name: { type: 'string', minLength: 2 },
+          },
+        },
+      },
+    },
+    controller.updateProfile as any
+  );
 }

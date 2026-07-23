@@ -45,6 +45,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ oldPasswordPlain: data.oldPassword, newPasswordPlain: data.newPassword }),
       }),
+    updateProfile: (data: { email?: string; name?: string }) =>
+      request<any>('/auth/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
   },
   borrowers: {
     list: (search?: string) =>

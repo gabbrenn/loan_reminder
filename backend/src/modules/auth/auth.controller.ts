@@ -71,4 +71,43 @@ export class AuthController {
       });
     }
   };
+
+  updateProfile = async (
+    request: FastifyRequest<{ Body: { email?: string; name?: string } }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const userId = (request.user as any)?.id;
+      if (!userId) {
+        return reply.code(401).send({
+          error: {
+            message: 'Unauthorized',
+            code: 'UNAUTHORIZED',
+          },
+        });
+      }
+
+      const updatedUser = await this.authService.updateProfile(userId, request.body);
+
+      // Sign a new JWT token with the updated info
+      const token = request.server.jwt.sign({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        name: updatedUser.name,
+      });
+
+      return reply.code(200).send({
+        user: updatedUser,
+        token,
+      });
+    } catch (error: any) {
+      return reply.code(400).send({
+        error: {
+          message: error.message || 'Failed to update profile',
+          code: 'BAD_REQUEST',
+        },
+      });
+    }
+  };
 }

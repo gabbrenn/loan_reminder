@@ -44,4 +44,20 @@ export class AuthService {
     await this.authRepository.updatePassword(userId, newPasswordHash);
     return true;
   }
+
+  async updateProfile(userId: string, data: { email?: string; name?: string }) {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (data.email && data.email !== user.email) {
+      const existing = await this.authRepository.findByEmail(data.email);
+      if (existing) {
+        throw new Error('A user with this email address already exists');
+      }
+    }
+
+    return this.authRepository.updateProfile(userId, data);
+  }
 }

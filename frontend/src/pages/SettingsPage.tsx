@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import {
   inputCls,
   labelCls,
@@ -35,11 +36,17 @@ const Toggle = ({
 );
 
 export default function SettingsPage() {
+  const { user, updateProfile } = useAuth();
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Profile states
+  const [profileEmail, setProfileEmail] = useState(user?.email || '');
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -72,12 +79,31 @@ export default function SettingsPage() {
         emailEnabled: settings.emailEnabled,
       });
       setSettings(updated.settings);
-      setSuccess('Settings saved successfully.');
+      setSuccess('System settings saved successfully.');
       setTimeout(() => setSuccess(''), 4000);
     } catch (e: any) {
       setError(e.message || 'Failed to save settings');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileSubmitting(true);
+    setError('');
+    setSuccess('');
+    try {
+      await updateProfile({
+        email: profileEmail,
+        name: profileName,
+      });
+      setSuccess('Profile updated successfully.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to update profile');
+    } finally {
+      setProfileSubmitting(false);
     }
   };
 
@@ -97,9 +123,50 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="max-w-xl space-y-6">
       {error && <div className={alertError}>{error}</div>}
       {success && <div className={alertSuccess}>{success}</div>}
+
+      {/* Admin Profile Form */}
+      <form onSubmit={handleUpdateProfile} className="space-y-4">
+        <div className="bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-md p-5">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5">Admin Profile Settings</h3>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+            Update your account details (Name and Email address)
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className={labelCls}>Name</label>
+              <input
+                type="text"
+                required
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Email Address</label>
+              <input
+                type="email"
+                required
+                value={profileEmail}
+                onChange={(e) => setProfileEmail(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              type="submit"
+              disabled={profileSubmitting}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-md text-sm transition-colors disabled:opacity-60 shadow-sm"
+            >
+              {profileSubmitting ? 'Saving...' : 'Save Profile'}
+            </button>
+          </div>
+        </div>
+      </form>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Reminder Windows */}

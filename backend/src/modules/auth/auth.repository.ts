@@ -20,4 +20,18 @@ export class AuthRepository {
       data: { passwordHash },
     });
   }
+
+  async updateProfile(id: string, data: { email?: string; name?: string }) {
+    return prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+  }
 }

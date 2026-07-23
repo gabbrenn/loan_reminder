@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (credentials: any) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  updateProfile: (data: { email?: string; name?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,8 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const updateProfile = async (data: { email?: string; name?: string }) => {
+    const res = await api.auth.updateProfile(data);
+    const jwtToken = res.token;
+    localStorage.setItem('jwt_token', jwtToken);
+    setToken(jwtToken);
+    const decoded = decodeToken(jwtToken);
+    setUser(decoded);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

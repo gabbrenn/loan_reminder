@@ -61,6 +61,9 @@ This file tracks the development progress of the MVP according to the build orde
 - [x] Idempotency rules via NotificationLog checks (sent once for warnings, daily max for overdue)
 - [x] Nodemailer integration with JSON transport fallback for local development
 - [x] Manual trigger POST /api/v1/reminders/trigger endpoint (guarded to Admin/Officer)
+- [x] Fully responsive inline-styled HTML layouts for borrower reminders and daily briefings
+- [x] Queue-based notification processing (logs saved as PENDING and dispatched via processQueue)
+- [x] 1-minute resend window for manual triggers (allows resending alerts for testing after 1 min)
 - [x] Write integration tests (all passing)
 
 ### 8. Dashboard
@@ -93,6 +96,8 @@ This file tracks the development progress of the MVP according to the build orde
 - `createdById` FK on Loan uses `SetNull` on delete — officer-deleted loans remain in the system, just un-assigned.
 - CSV export is streamed as `text/csv` response — no temp files, no S3.
 - Daily admin briefing email is best-effort: failure is logged to console but does NOT crash the cron run.
+- Swapped daily-level email idempotency check for a 1-minute window check, enabling supervisors to trigger and test resending email.
+- Exposed a PATCH /profile endpoint to update admin details (email/name) and return a new JWT token, keeping frontend context in sync.
 
 ---
 
@@ -137,6 +142,7 @@ This file tracks the development progress of the MVP according to the build orde
 - [x] Configurable reminder day windows (Days Before 1/2/3) in database settings table
 - [x] Globally enable/disable Email and SMS channels in settings UI
 - [x] `SettingsPage.tsx` — Admin form for custom alert configuration and channel toggles
+- [x] [NEW] Admin profile settings (name & email address updating) with live AuthContext token refresh
 - [x] Integration tests covering default fetch, updates, and access controls
 
 ### 17. Audit Logs
