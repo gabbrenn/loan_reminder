@@ -52,22 +52,20 @@ export class ReminderService {
 
       if (!reminderType) continue;
 
-      // Idempotency check (within 1 minute window check)
-      const alreadySent = await this.repo.hasReminderBeenSent({
+      // 1. Process EMAIL
+      const alreadySentEmail = await this.repo.hasReminderBeenSent({
         repaymentScheduleId: schedule.id,
         reminderType,
+        channel: NotificationChannel.EMAIL,
       });
 
-      if (alreadySent) continue;
+      if (!alreadySentEmail) {
+        const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
+        const formattedDueDate = dueKigali.toFormat('dd LLL yyyy');
+        let emailBody = '';
 
-      const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
-      const formattedDueDate = dueKigali.toFormat('dd LLL yyyy');
-      let subject = '';
-      let body = '';
-
-      if (reminderType === ReminderType.OVERDUE) {
-        subject = `⚠️ OVERDUE Loan Repayment Notice - ${schedule.loan.loanNumber}`;
-        body = `
+        if (reminderType === ReminderType.OVERDUE) {
+          emailBody = `
 <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f4f6f9; padding: 30px 20px; color: #333;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); border: 1px solid #e1e4e8;">
     <!-- Header -->
@@ -119,10 +117,9 @@ export class ReminderService {
   </div>
 </div>
 `;
-      } else {
-        const daysText = diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
-        subject = `Reminder: Loan Repayment Due ${daysText} - ${schedule.loan.loanNumber}`;
-        body = `
+        } else {
+          const daysText = diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
+          emailBody = `
 <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f4f6f9; padding: 30px 20px; color: #333;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); border: 1px solid #e1e4e8;">
     <!-- Header -->
@@ -174,14 +171,42 @@ export class ReminderService {
   </div>
 </div>
 `;
+        }
+
+        await this.repo.createPendingNotification({
+          repaymentScheduleId: schedule.id,
+          reminderType,
+          channel: NotificationChannel.EMAIL,
+          message: emailBody,
+        });
       }
 
-      await this.repo.createPendingNotification({
+      // 2. Process SMS
+      const alreadySentSMS = await this.repo.hasReminderBeenSent({
         repaymentScheduleId: schedule.id,
         reminderType,
-        channel: NotificationChannel.EMAIL,
-        message: body,
+        channel: NotificationChannel.SMS,
       });
+
+      if (!alreadySentSMS) {
+        const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
+        const formattedDueDate = dueKigali.toFormat('dd LLL yyyy');
+        let smsBody = '';
+
+        if (reminderType === ReminderType.OVERDUE) {
+          smsBody = `Urgent: Your installment of RWF ${amountRemaining.toLocaleString()} for Loan ${schedule.loan.loanNumber} is OVERDUE. Please pay immediately. - MFI Team`;
+        } else {
+          const daysText = diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
+          smsBody = `Reminder: Your installment of RWF ${amountRemaining.toLocaleString()} for Loan ${schedule.loan.loanNumber} is due ${daysText} (${formattedDueDate}). - MFI Team`;
+        }
+
+        await this.repo.createPendingNotification({
+          repaymentScheduleId: schedule.id,
+          reminderType,
+          channel: NotificationChannel.SMS,
+          message: smsBody,
+        });
+      }
     }
 
     // 3. Process the queue
@@ -271,42 +296,92 @@ export class ReminderService {
 
     for (const log of pendingLogs) {
       const borrower = log.repaymentSchedule.loan.borrower;
-      if (!borrower || !borrower.email) {
+      if (!borrower) {
         await this.repo.updateNotificationStatus(
           log.id,
           NotificationStatus.FAILED,
-          'Borrower email not found'
+          'Borrower not found'
         );
         failedCount++;
         continue;
       }
 
-      if (settings.emailEnabled) {
-        try {
-          await notify.send({
-            to: borrower.email,
-            channel: 'email',
-            data: {
-              message: log.message || '',
-            },
-          });
-          await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
-          sentCount++;
-        } catch (err: any) {
+      if (log.channel === NotificationChannel.EMAIL) {
+        if (!borrower.email) {
           await this.repo.updateNotificationStatus(
             log.id,
             NotificationStatus.FAILED,
-            err.message || 'Unknown notification error'
+            'Borrower email not found'
+          );
+          failedCount++;
+          continue;
+        }
+
+        if (settings.emailEnabled) {
+          try {
+            await notify.send({
+              to: borrower.email,
+              channel: 'email',
+              data: {
+                message: log.message || '',
+              },
+            });
+            await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
+            sentCount++;
+          } catch (err: any) {
+            await this.repo.updateNotificationStatus(
+              log.id,
+              NotificationStatus.FAILED,
+              err.message || 'Unknown notification error'
+            );
+            failedCount++;
+          }
+        } else {
+          await this.repo.updateNotificationStatus(
+            log.id,
+            NotificationStatus.FAILED,
+            'Email notifications are globally disabled in settings'
           );
           failedCount++;
         }
-      } else {
-        await this.repo.updateNotificationStatus(
-          log.id,
-          NotificationStatus.FAILED,
-          'Email notifications are globally disabled in settings'
-        );
-        failedCount++;
+      } else if (log.channel === NotificationChannel.SMS) {
+        if (!borrower.phone) {
+          await this.repo.updateNotificationStatus(
+            log.id,
+            NotificationStatus.FAILED,
+            'Borrower phone number not found'
+          );
+          failedCount++;
+          continue;
+        }
+
+        if (settings.smsEnabled) {
+          try {
+            await notify.send({
+              to: borrower.phone,
+              channel: 'sms',
+              data: {
+                message: log.message || '',
+              },
+            });
+            await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
+            sentCount++;
+          } catch (err: any) {
+            await this.repo.updateNotificationStatus(
+              log.id,
+              NotificationStatus.FAILED,
+              err.message || 'Unknown SMS notification error'
+            );
+            failedCount++;
+          }
+        } else {
+          await this.repo.updateNotificationStatus(
+            log.id,
+            NotificationStatus.FAILED,
+            'SMS notifications are globally disabled in settings'
+          );
+          failedCount++;
+        }
       }
     }
 

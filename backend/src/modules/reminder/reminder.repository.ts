@@ -27,12 +27,14 @@ export class ReminderRepository {
   async hasReminderBeenSent(params: {
     repaymentScheduleId: string;
     reminderType: ReminderType;
+    channel: NotificationChannel;
   }) {
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
     const existing = await prisma.notificationLog.findFirst({
       where: {
         repaymentScheduleId: params.repaymentScheduleId,
         reminderType: params.reminderType,
+        channel: params.channel,
         status: {
           in: [NotificationStatus.SENT, NotificationStatus.PENDING],
         },
