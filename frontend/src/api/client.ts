@@ -50,6 +50,16 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    forgotPassword: (email: string) =>
+      request<any>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (data: { token: string; newPassword: string }) =>
+      request<any>('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token: data.token, newPasswordPlain: data.newPassword }),
+      }),
   },
   borrowers: {
     list: (search?: string) =>

@@ -39,11 +39,16 @@ const AdminAndManagerRoute: React.FC<{ children: React.ReactNode }> = ({ childre
   return <>{children}</>;
 };
 
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route
           path="/"

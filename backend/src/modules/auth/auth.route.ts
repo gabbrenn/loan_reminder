@@ -73,4 +73,45 @@ export async function authRoutes(fastify: FastifyInstance) {
     },
     controller.updateProfile as any
   );
+
+  // Forgot Password route
+  fastify.post(
+    '/forgot-password',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+          },
+        },
+      },
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    controller.forgotPassword as any
+  );
+
+  // Reset Password route
+  fastify.post(
+    '/reset-password',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['token', 'newPasswordPlain'],
+          properties: {
+            token: { type: 'string' },
+            newPasswordPlain: { type: 'string', minLength: 6 },
+          },
+        },
+      },
+    },
+    controller.resetPassword as any
+  );
 }

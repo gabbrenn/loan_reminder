@@ -55,15 +55,16 @@ enum ReminderType {
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  name         String
-  role         Role
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  loans        Loan[]
-  auditLogs    AuditLog[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  name                String
+  role                Role
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  loans               Loan[]
+  auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -177,4 +178,16 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
 }

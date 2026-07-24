@@ -1,5 +1,11 @@
 import { AuthRepository } from './auth.repository';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { sendEmail } from '../../lib/notify';
+
+const RESET_TOKEN_EXPIRY_MINUTES = 30;
+const RESET_TEMPLATE_ID = process.env.RESET_PASSWORD_TEMPLATE || process.env.REMINDER_TEMPLATE || '';
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 export class AuthService {
   private authRepository: AuthRepository;
@@ -19,7 +25,6 @@ export class AuthService {
       throw new Error('Invalid email or password');
     }
 
-    // Return user without password hash
     const { passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
@@ -35,7 +40,6 @@ export class AuthService {
       throw new Error('Invalid current password');
     }
 
-    // Basic password strength validation (e.g., min 6 characters)
     if (newPasswordPlain.length < 6) {
       throw new Error('New password must be at least 6 characters long');
     }
@@ -59,5 +63,70 @@ export class AuthService {
     }
 
     return this.authRepository.updateProfile(userId, data);
+  }
+
+  // ─── Forgot Password ──────────────────────────────────────────────────────
+
+  async forgotPassword(email: string) {
+    const user = await this.authRepository.findByEmail(email);
+    // Always respond with success even if user not found — prevents email enumeration
+    if (!user) return;
+
+    // Invalidate any previous unused tokens
+    await this.authRepository.invalidateUserResetTokens(user.id);
+
+    // Generate a secure random token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+    await this.authRepository.createResetToken(user.id, rawToken, expiresAt);
+
+    const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
+
+    // Send email via notify SDK
+    await sendEmail('email', user.email, RESET_TEMPLATE_ID, {
+      name: user.name,
+      resetLink,
+      expiryMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+      subject: 'Password Reset Request — LoanReminder',
+      previewText: 'Click the link below to reset your password.',
+      body: `
+        <p>Hello <strong>${user.name}</strong>,</p>
+        <p>You requested to reset your password. Click the button below to set a new password. This link is valid for <strong>${RESET_TOKEN_EXPIRY_MINUTES} minutes</strong>.</p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${resetLink}" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Reset Password</a>
+        </p>
+        <p>If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
+        <p style="color:#94a3b8;font-size:12px;">This link expires in ${RESET_TOKEN_EXPIRY_MINUTES} minutes.</p>
+      `,
+    });
+  }
+
+  // ─── Reset Password ───────────────────────────────────────────────────────
+
+  async resetPassword(token: string, newPasswordPlain: string) {
+    if (newPasswordPlain.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    const record = await this.authRepository.findResetToken(token);
+
+    if (!record) {
+      throw new Error('Invalid or expired reset link. Please request a new one.');
+    }
+
+    if (record.usedAt) {
+      throw new Error('This reset link has already been used. Please request a new one.');
+    }
+
+    if (new Date() > record.expiresAt) {
+      throw new Error('This reset link has expired. Please request a new one.');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPasswordPlain, 10);
+    await this.authRepository.updatePassword(record.userId, newPasswordHash);
+    await this.authRepository.markResetTokenUsed(record.id);
+
+    return true;
   }
 }

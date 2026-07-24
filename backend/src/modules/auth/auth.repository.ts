@@ -1,5 +1,4 @@
 import prisma from '../../lib/prisma';
-import { Role } from '@prisma/client';
 
 export class AuthRepository {
   async findByEmail(email: string) {
@@ -32,6 +31,36 @@ export class AuthRepository {
         role: true,
         createdAt: true,
       },
+    });
+  }
+
+  // ─── Password Reset ───────────────────────────────────────────────────────
+
+  async createResetToken(userId: string, token: string, expiresAt: Date) {
+    return prisma.passwordResetToken.create({
+      data: { userId, token, expiresAt },
+    });
+  }
+
+  async findResetToken(token: string) {
+    return prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+  }
+
+  async markResetTokenUsed(id: string) {
+    return prisma.passwordResetToken.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
+
+  /** Invalidate any existing unused tokens for a user before issuing a new one */
+  async invalidateUserResetTokens(userId: string) {
+    return prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
     });
   }
 }
