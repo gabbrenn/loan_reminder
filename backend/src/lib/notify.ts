@@ -5,21 +5,22 @@ const notify = new Notify({
     apiKey: apiKeys as any
 })
 
-const { NOTIFY_API_URL, NOTIFY_KEY } = process.env;
-
 export const sendEmail = async (
     channel: string,
     email: string,
-    templateId: string,
-    payload: Record<string, any>
+    payload: Record<string, any>,
+    templateId?: string,
 ): Promise<any> => {
     try {
+        const apiUrl = process.env.NOTIFY_API_URL;
+        const apiKey = process.env.NOTIFY_KEY;
+
         const response = await axios.post(
-            NOTIFY_API_URL as string,
-            { channel, recipient: email, templateId, payload },
+            apiUrl as string,
+            { channel: channel, recipient: email, payload, ...(templateId && { templateId }) },
             {
                 headers: {
-                    Authorization: `Bearer ${NOTIFY_KEY}`,
+                    Authorization: `Bearer ${apiKey}`,
                     'Content-Type': 'application/json',
                 },
             }
@@ -32,5 +33,6 @@ export const sendEmail = async (
         return null;
     }
 };
+
 
 export default notify
