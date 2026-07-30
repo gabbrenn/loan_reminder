@@ -32,20 +32,34 @@ const fastify = Fastify({
 const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN;
 fastify.register(fastifyCors, {
   origin: (origin, cb) => {
-    // Allow requests with no origin (like mobile apps, curl, postman) or matching origins
     if (!origin) return cb(null, true);
     if (!frontendUrl) return cb(null, true);
     const allowedOrigins = frontendUrl.split(',').map((u) => u.trim());
     if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       return cb(null, true);
     }
-    return cb(null, true); // Fallback allow in dev
+    return cb(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   strictPreflight: false,
 });
+
+// Guarantee CORS headers on every single incoming response (including preflight and validation errors)
+fastify.addHook('onRequest', async (request, reply) => {
+  const origin = request.headers.origin;
+  if (origin) {
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  }
+  if (request.method === 'OPTIONS') {
+    return reply.code(204).send();
+  }
+});
+
 
 
 
