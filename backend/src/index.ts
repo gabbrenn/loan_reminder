@@ -31,11 +31,16 @@ const fastify = Fastify({
 // Register CORS plugin
 const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN;
 fastify.register(fastifyCors, {
-  origin: frontendUrl ? frontendUrl.split(',').map((u) => u.trim()) : true,
+  origin: frontendUrl
+    ? frontendUrl.split(',').map((u) => u.trim())
+    : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  strictPreflight: false,     // Allow OPTIONS on routes that don't exist (avoids 404 CORS errors)
+  hook: 'preHandler',         // Ensure CORS headers are added before any handler runs
 });
+
 
 // Error handling matching NFR: { error: { message, code } }
 fastify.setErrorHandler((error, request, reply) => {
