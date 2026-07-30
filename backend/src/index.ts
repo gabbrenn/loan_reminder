@@ -26,6 +26,15 @@ const fastify = Fastify({
   },
 });
 
+// Register CORS plugin
+const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN;
+fastify.register(fastifyCors, {
+  origin: frontendUrl ? frontendUrl.split(',').map((u) => u.trim()) : true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+});
+
 // Error handling matching NFR: { error: { message, code } }
 fastify.setErrorHandler((error, request, reply) => {
   fastify.log.error(error);

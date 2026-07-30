@@ -56,16 +56,18 @@ export class AuthRepository {
 
   // ─── Password Reset ───────────────────────────────────────────────────────
 
-  async createResetToken(userId: string, token: string, expiresAt: Date) {
+  async createResetToken(id: string, isBorrower: boolean, token: string, expiresAt: Date) {
     return prisma.passwordResetToken.create({
-      data: { userId, token, expiresAt },
+      data: isBorrower
+        ? { borrowerId: id, token, expiresAt }
+        : { userId: id, token, expiresAt },
     });
   }
 
   async findResetToken(token: string) {
     return prisma.passwordResetToken.findUnique({
       where: { token },
-      include: { user: true },
+      include: { user: true, borrower: true },
     });
   }
 
@@ -76,11 +78,14 @@ export class AuthRepository {
     });
   }
 
-  /** Invalidate any existing unused tokens for a user before issuing a new one */
-  async invalidateUserResetTokens(userId: string) {
+  /** Invalidate any existing unused tokens for a user/borrower before issuing a new one */
+  async invalidateUserResetTokens(id: string, isBorrower: boolean) {
     return prisma.passwordResetToken.updateMany({
-      where: { userId, usedAt: null },
+      where: isBorrower
+        ? { borrowerId: id, usedAt: null }
+        : { userId: id, usedAt: null },
       data: { usedAt: new Date() },
     });
   }
 }
+

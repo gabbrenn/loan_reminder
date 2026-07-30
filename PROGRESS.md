@@ -9,6 +9,10 @@ This file tracks the development progress of the MVP according to the build orde
 - **Env variables needed**:
   - `DATABASE_URL` (PostgreSQL connection string)
   - `JWT_SECRET` (For signing JWTs)
+  - `FRONTEND_URL` / `CORS_ORIGIN` (Backend CORS configuration for frontend origins)
+  - `VITE_API_URL` (Optional frontend env variable for custom backend base URL)
+
+
 - **Commands**:
   - Install dependencies: `npm install` in both backend/frontend directories.
   - Setup DB: `npx prisma db push`

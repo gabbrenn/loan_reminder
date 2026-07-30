@@ -101,6 +101,7 @@ export class AuthService {
     let targetUserId = user?.id;
     let targetName = user?.name;
     let targetEmail = user?.email;
+    let isBorrower = false;
 
     if (!user) {
       const borrower = await this.authRepository.findBorrowerByEmail(email);
@@ -108,6 +109,7 @@ export class AuthService {
         targetUserId = borrower.id;
         targetName = borrower.fullName;
         targetEmail = borrower.email;
+        isBorrower = true;
       }
     }
 
@@ -115,13 +117,13 @@ export class AuthService {
     if (!targetUserId || !targetEmail || !targetName) return;
 
     // Invalidate any previous unused tokens
-    await this.authRepository.invalidateUserResetTokens(targetUserId);
+    await this.authRepository.invalidateUserResetTokens(targetUserId, isBorrower);
 
     // Generate a secure random token
     const rawToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
-    await this.authRepository.createResetToken(targetUserId, rawToken, expiresAt);
+    await this.authRepository.createResetToken(targetUserId, isBorrower, rawToken, expiresAt);
 
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
@@ -166,15 +168,15 @@ export class AuthService {
     }
 
     const newPasswordHash = await bcrypt.hash(newPasswordPlain, 10);
-    const user = await this.authRepository.findById(record.userId);
-    if (user) {
+    if (record.userId) {
       await this.authRepository.updatePassword(record.userId, newPasswordHash);
-    } else {
-      await this.authRepository.updateBorrowerPassword(record.userId, newPasswordHash);
+    } else if (record.borrowerId) {
+      await this.authRepository.updateBorrowerPassword(record.borrowerId, newPasswordHash);
     }
     await this.authRepository.markResetTokenUsed(record.id);
 
     return true;
   }
 }
+
 

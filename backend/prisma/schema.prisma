@@ -76,20 +76,21 @@ model User {
 }
 
 model Borrower {
-  id             String   @id @default(uuid())
-  fullName       String
-  nationalId     String   @unique
-  phone          String   @unique
-  email          String   @unique
-  address        String
-  occupation     String
-  guarantorName  String
-  guarantorPhone String
-  photo          String?
-  passwordHash   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  loans          Loan[]
+  id                  String               @id @default(uuid())
+  fullName            String
+  nationalId          String               @unique
+  phone               String               @unique
+  email               String               @unique
+  address             String
+  occupation          String
+  guarantorName       String
+  guarantorPhone      String
+  photo               String?
+  passwordHash        String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  loans               Loan[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("borrowers")
 }
@@ -134,7 +135,6 @@ model Message {
 
   @@map("messages")
 }
-
 
 model LoanRepayment {
   id            String        @id @default(uuid())
@@ -204,13 +204,16 @@ model AuditLog {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
+  id         String    @id @default(uuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  borrowerId String?
+  borrower   Borrower? @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
 
   @@map("password_reset_tokens")
 }
+

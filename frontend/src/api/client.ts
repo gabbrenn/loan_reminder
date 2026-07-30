@@ -1,4 +1,8 @@
-const API_PREFIX = '/api/v1';
+const BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const API_PREFIX = BASE_URL
+  ? (BASE_URL.endsWith('/api/v1') ? BASE_URL : `${BASE_URL}/api/v1`)
+  : '/api/v1';
+
 
 async function request<T>(
   url: string,
