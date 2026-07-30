@@ -271,11 +271,10 @@ export class ReminderService {
 </div>
 `;
 
-          await sendEmail('email', adminEmails[0], process.env.REMINDER_TEMPLATE || '', {
-            subject,
-            previewText: 'Daily operational summary from LoanReminder engine.',
-            body,
+          await sendEmail('EMAIL', adminEmails[0], {
+            message: body,
           });
+
         }
       } catch (e) {
         console.error('Failed to send daily admin briefing email:', e);
@@ -318,12 +317,8 @@ export class ReminderService {
 
         if (settings.emailEnabled) {
           try {
-            await notify.send({
-              to: borrower.email,
-              channel: 'email',
-              data: {
-                message: log.message || '',
-              },
+            await sendEmail('EMAIL', borrower.email, {
+              message: log.message || '',
             });
             await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
             sentCount++;
@@ -356,12 +351,8 @@ export class ReminderService {
 
         if (settings.smsEnabled) {
           try {
-            await notify.send({
-              to: borrower.phone,
-              channel: 'sms',
-              data: {
-                message: log.message || '',
-              },
+            await sendEmail('SMS', borrower.phone, {
+              message: log.message || '',
             });
             await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
             sentCount++;

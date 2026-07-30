@@ -29,10 +29,14 @@ export const sendEmail = async (
         console.log('Notify API response:', response.status, response.data);
         return response.data;
     } catch (err: any) {
-        console.error('Notify API call failed:', err?.response?.data || err.message);
+        const status = err?.response?.status;
+        const data = err?.response?.data;
+        const message = err?.message;
+        console.error('Notify API call failed — status:', status, '| data:', JSON.stringify(data), '| message:', message);
         return null;
     }
 };
+
 
 
 export default notify

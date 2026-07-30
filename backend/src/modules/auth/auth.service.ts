@@ -128,7 +128,8 @@ export class AuthService {
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
     // Send email via notify SDK
-    await sendEmail('email', targetEmail, {
+    await sendEmail('EMAIL', targetEmail, {
+
       message: `
         <p>Hello <strong>${targetName}</strong>,</p>
         <p>You requested to reset your password. Click the button below to set a new password. This link is valid for <strong>${RESET_TOKEN_EXPIRY_MINUTES} minutes</strong>.</p>
