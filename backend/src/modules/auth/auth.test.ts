@@ -6,10 +6,26 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import { authRoutes } from './auth.route';
 import { authorize } from '../../middleware/auth.middleware';
 
+import bcrypt from 'bcrypt';
+import prisma from '../../lib/prisma';
+
 describe('Auth & Role Module Integration Tests', () => {
   let app: any;
 
   before(async () => {
+    // Ensure test admin user exists in DB
+    const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
+    await prisma.user.upsert({
+      where: { email: 'admin@loanreminder.com' },
+      update: { passwordHash: adminPasswordHash },
+      create: {
+        email: 'admin@loanreminder.com',
+        passwordHash: adminPasswordHash,
+        name: 'System Admin',
+        role: 'ADMIN',
+      },
+    });
+
     app = Fastify();
     app.register(fastifyJwt, {
       secret: process.env.JWT_SECRET || 'test-secret-key-12345',
@@ -58,6 +74,7 @@ describe('Auth & Role Module Integration Tests', () => {
   after(async () => {
     await app.close();
   });
+
 
   let adminToken: string;
   let officerToken: string;
