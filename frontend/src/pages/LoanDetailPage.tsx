@@ -41,6 +41,14 @@ export const LoanDetailPage: React.FC = () => {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
 
+  // Payment form state
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [recording, setRecording] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+
   const loadMessages = async () => {
     if (!id) return;
     setChatLoading(true);

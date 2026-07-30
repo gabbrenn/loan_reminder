@@ -1,6 +1,8 @@
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
+import fastifyCors from '@fastify/cors';
+
 import { authRoutes } from './modules/auth/auth.route';
 import { borrowerRoutes } from './modules/borrower/borrower.route';
 import { loanRoutes } from './modules/loan/loan.route';
