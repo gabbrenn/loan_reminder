@@ -31,20 +31,47 @@ const fastify = Fastify({
 // Register CORS plugin
 const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN;
 fastify.register(fastifyCors, {
-  origin: frontendUrl
-    ? frontendUrl.split(',').map((u) => u.trim())
-    : true,
+  origin: (origin, cb) => {
+    // Allow requests with no origin (like mobile apps, curl, postman) or matching origins
+    if (!origin) return cb(null, true);
+    if (!frontendUrl) return cb(null, true);
+    const allowedOrigins = frontendUrl.split(',').map((u) => u.trim());
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return cb(null, true);
+    }
+    return cb(null, true); // Fallback allow in dev
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  strictPreflight: false,     // Allow OPTIONS on routes that don't exist (avoids 404 CORS errors)
-  hook: 'preHandler',         // Ensure CORS headers are added before any handler runs
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  strictPreflight: false,
 });
 
+
+
+// Custom 404 handler ensuring CORS headers are included on 404 responses
+fastify.setNotFoundHandler((request, reply) => {
+  const origin = request.headers.origin;
+  if (origin) {
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+  }
+  return reply.code(404).send({
+    error: {
+      message: `Route ${request.method}:${request.url} not found`,
+      code: 'NOT_FOUND',
+    },
+  });
+});
 
 // Error handling matching NFR: { error: { message, code } }
 fastify.setErrorHandler((error, request, reply) => {
   fastify.log.error(error);
+  const origin = request.headers.origin;
+  if (origin) {
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+  }
   
   const err = error as any;
   if (err.statusCode) {
@@ -63,6 +90,7 @@ fastify.setErrorHandler((error, request, reply) => {
     },
   });
 });
+
 
 // Register JWT plugin
 const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-for-development';
