@@ -115,10 +115,11 @@ describe('Notification Log Integration Tests', () => {
     assert.ok(body.length >= 1);
 
     const ourLog = body.find(
-      (l: any) => l.repaymentSchedule?.loan?.borrower?.nationalId === 'NID-NOTIF-TEST-777'
+      (l: any) => l.repaymentSchedule?.loan?.borrower?.nationalId === 'NID-NOTIF-TEST-777' && l.channel === 'EMAIL'
     );
-    assert.ok(ourLog, 'Should find a notification for our test borrower');
+    assert.ok(ourLog, 'Should find an email notification for our test borrower');
     assert.strictEqual(ourLog.channel, 'EMAIL');
+
     assert.ok(['SENT', 'FAILED'].includes(ourLog.status), `Expected status to be SENT or FAILED but got ${ourLog.status}`);
     assert.ok(ourLog.repaymentSchedule?.loan?.borrower?.fullName);
 

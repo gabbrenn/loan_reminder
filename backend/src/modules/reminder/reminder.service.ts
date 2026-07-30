@@ -271,17 +271,16 @@ export class ReminderService {
 </div>
 `;
 
-          await notify.send({
-            to: adminEmails.join(','),
-            channel: 'email',
-            data: {
-              message: body,
-            },
+          await sendEmail('email', adminEmails[0], process.env.REMINDER_TEMPLATE || '', {
+            subject,
+            previewText: 'Daily operational summary from LoanReminder engine.',
+            body,
           });
         }
       } catch (e) {
         console.error('Failed to send daily admin briefing email:', e);
       }
+
     }
 
     return { totalChecked, sentCount, failedCount };

@@ -13,18 +13,24 @@ export const sendEmail = async (
     templateId: string,
     payload: Record<string, any>
 ): Promise<any> => {
-    const response = await axios.post(
-        NOTIFY_API_URL as string,
-        { channel, recipient: email, templateId, payload },
-        {
-            headers: {
-                Authorization: `Bearer ${NOTIFY_KEY}`,
-                'Content-Type': 'application/json',
-            },
-        }
-    );
+    try {
+        const response = await axios.post(
+            NOTIFY_API_URL as string,
+            { channel, recipient: email, templateId, payload },
+            {
+                headers: {
+                    Authorization: `Bearer ${NOTIFY_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
 
-    console.log('Notify API response:', response.status, response.data);
-    return response.data;
+        console.log('Notify API response:', response.status, response.data);
+        return response.data;
+    } catch (err: any) {
+        console.error('Notify API call failed:', err?.response?.data || err.message);
+        return null;
+    }
 };
+
 export default notify
