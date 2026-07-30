@@ -12,6 +12,7 @@ import { notificationRoutes } from './modules/notification/notification.route';
 import { userRoutes } from './modules/user/user.route';
 import { settingsRoutes } from './modules/settings/settings.route';
 import { auditRoutes } from './modules/audit/audit.route';
+import { messageRoutes } from './modules/message/message.route';
 
 const fastify = Fastify({
   logger: {
@@ -88,8 +89,12 @@ fastify.register(borrowerRoutes, { prefix: '/api/v1/borrowers' });
 // Register Loan Routes
 fastify.register(loanRoutes, { prefix: '/api/v1/loans' });
 
+// Register Loan Messaging Routes
+fastify.register(messageRoutes, { prefix: '/api/v1/loans' });
+
 // Register Repayment Routes
 fastify.register(repaymentRoutes, { prefix: '/api/v1/repayments' });
+
 
 // Register Reminder Routes
 fastify.register(reminderRoutes, { prefix: '/api/v1/reminders' });

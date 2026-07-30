@@ -162,4 +162,17 @@ export const api = {
       return request<any>(`/audit${query}`);
     },
   },
+  messages: {
+    getLoanMessages: (loanId: string) => request<any>(`/loans/${loanId}/messages`),
+    sendMessage: (loanId: string, message: string) =>
+      request<any>(`/loans/${loanId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      }),
+    markAsRead: (loanId: string) =>
+      request<any>(`/loans/${loanId}/messages/read`, {
+        method: 'PATCH',
+      }),
+  },
 };
+

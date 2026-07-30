@@ -4,9 +4,10 @@ import { api } from '../api/client';
 interface User {
   id: string;
   email: string;
-  role: 'ADMIN' | 'LOAN_OFFICER' | 'CREDIT_MANAGER';
+  role: 'ADMIN' | 'LOAN_OFFICER' | 'CREDIT_MANAGER' | 'BORROWER';
   name: string;
 }
+
 
 interface AuthContextType {
   user: User | null;

@@ -1,7 +1,11 @@
 import { BorrowerRepository, CreateBorrowerInput, UpdateBorrowerInput } from './borrower.repository';
 import { AuditService } from '../audit/audit.service';
+import bcrypt from 'bcrypt';
+import { sendEmail } from '../../lib/notify';
+import { AuthService } from '../auth/auth.service';
 
 const auditService = new AuditService();
+const authService = new AuthService();
 
 export class BorrowerService {
   private repo: BorrowerRepository;
@@ -22,12 +26,30 @@ export class BorrowerService {
     if (byPhone) throw new Error('A borrower with this phone number already exists');
     if (byEmail) throw new Error('A borrower with this email already exists');
 
-    const borrower = await this.repo.create(data);
+    // Default password hash for new borrowers
+    const defaultPassword = 'Borrower123!';
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+    const borrower = await this.repo.create({
+      ...data,
+      passwordHash,
+    });
+
     if (actorId) {
       await auditService.log(actorId, 'CREATE', 'BORROWER', borrower.id).catch(() => {});
     }
+
+    // Send account registration email with link to reset/set password
+    try {
+      await authService.forgotPassword(borrower.email);
+    } catch (err) {
+      // Best-effort email notification
+      console.error('Failed to send borrower welcome email:', err);
+    }
+
     return borrower;
   }
+
 
   private calculateRiskScore(borrower: any): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (!borrower.loans || borrower.loans.length === 0) {

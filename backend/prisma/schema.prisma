@@ -13,6 +13,12 @@ enum Role {
   ADMIN
   LOAN_OFFICER
   CREDIT_MANAGER
+  BORROWER
+}
+
+enum SenderType {
+  BORROWER
+  LOAN_OFFICER
 }
 
 enum LoanStatus {
@@ -80,6 +86,7 @@ model Borrower {
   guarantorName  String
   guarantorPhone String
   photo          String?
+  passwordHash   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   loans          Loan[]
@@ -109,9 +116,25 @@ model Loan {
 
   repaymentSchedules RepaymentSchedule[]
   repayments         LoanRepayment[]
+  messages           Message[]
 
   @@map("loans")
 }
+
+model Message {
+  id         String     @id @default(uuid())
+  loanId     String
+  loan       Loan       @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  senderType SenderType
+  senderId   String
+  receiverId String
+  message    String     @db.Text
+  isRead     Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+
+  @@map("messages")
+}
+
 
 model LoanRepayment {
   id            String        @id @default(uuid())

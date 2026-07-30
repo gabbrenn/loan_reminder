@@ -187,10 +187,26 @@ This file tracks the development progress of the MVP according to the build orde
 
 ### Files Changed
 - `src/index.css` — Inter font import & dark mode variant configuration
-- `src/App.css` — cleared boilerplate
-- `src/components/ui.tsx` — shared UI primitives (inputs, selectors, badges, tables, modals)
-- `src/context/ThemeContext.tsx` — theme toggler state provider
-- `src/components/Layout.tsx` — layout with theme toggler button
-- All pages in `src/pages/` — rewrites to use `ui.tsx` with light & dark variations (dual classes)
+### 19. Borrower Login & Loan-specific Messaging System
+- [x] **Prisma Schema Update**:
+  - `BORROWER` added to `Role` enum.
+  - `passwordHash` added to `Borrower` model.
+  - `SenderType` enum (`BORROWER`, `LOAN_OFFICER`) created.
+  - `Message` model added matching exact spec (`id`, `loanId`, `senderType`, `senderId`, `receiverId`, `message`, `isRead`, `createdAt`).
+- [x] **Borrower Authentication & Welcome Email**:
+  - `AuthService.login` updated to support `BORROWER` role authentication against the `Borrower` table.
+  - Borrower registration in `BorrowerService.createBorrower` hashes a default password (`Borrower123!`) and dispatches a password reset / activation email to inform the borrower about their account for loan tracking.
+  - Password reset flow in `AuthService` expanded to handle both system Users and Borrowers.
+- [x] **Message Backend Module** (`message.{repository,service,controller,route}.ts`):
+  - `POST /api/v1/loans/:loanId/messages`: sends message automatically routed between borrower and managing loan officer.
+  - `GET /api/v1/loans/:loanId/messages`: returns full message history for the loan and marks unread messages as read.
+  - `PATCH /api/v1/loans/:loanId/messages/read`: marks messages as read.
+  - Role guarding ensures borrowers can only access conversations for their own loans.
+- [x] **Frontend Integration**:
+  - `AuthContext` updated for `BORROWER` role.
+  - `Layout.tsx` renders tailored navigation ("My Loans", "Change Password") and `BORROWER` badge for logged-in borrowers.
+  - `LoanDetailPage.tsx` features a "Contact Loan Officer" / "Loan Messages" button and interactive chat modal with live conversation history, sender tags, and response submission.
+- [x] **Integration Tests**: `message.test.ts` added with 4 test cases covering loan-specific message sending, officer replies, history isolation, and authorization guards (100% passing).
+
 
 

@@ -89,16 +89,23 @@ export const Layout: React.FC = () => {
     }
   };
 
-  const navItems = [
-    { label: 'Dashboard', path: '/' },
-    { label: 'Borrowers', path: '/borrowers' },
-    { label: 'Loans', path: '/loans' },
-    { label: 'Notifications', path: '/notifications' },
-    { label: 'Change Password', path: '/settings/password' },
-    ...(user?.role === 'ADMIN' ? [{ label: 'User Management', path: '/users' }] : []),
-    ...(user?.role === 'ADMIN' ? [{ label: 'Settings', path: '/settings' }] : []),
-    ...(user?.role === 'ADMIN' || user?.role === 'CREDIT_MANAGER' ? [{ label: 'Audit Log', path: '/audit' }] : []),
-  ];
+  const isBorrower = user?.role === 'BORROWER';
+
+  const navItems = isBorrower
+    ? [
+        { label: 'My Loans', path: '/loans' },
+        { label: 'Change Password', path: '/settings/password' },
+      ]
+    : [
+        { label: 'Dashboard', path: '/' },
+        { label: 'Borrowers', path: '/borrowers' },
+        { label: 'Loans', path: '/loans' },
+        { label: 'Notifications', path: '/notifications' },
+        { label: 'Change Password', path: '/settings/password' },
+        ...(user?.role === 'ADMIN' ? [{ label: 'User Management', path: '/users' }] : []),
+        ...(user?.role === 'ADMIN' ? [{ label: 'Settings', path: '/settings' }] : []),
+        ...(user?.role === 'ADMIN' || user?.role === 'CREDIT_MANAGER' ? [{ label: 'Audit Log', path: '/audit' }] : []),
+      ];
 
   const currentPage = navItems.find((n) => n.path === location.pathname);
 
@@ -106,7 +113,9 @@ export const Layout: React.FC = () => {
     ADMIN: 'bg-red-500/10 text-red-600 border border-red-200 dark:text-red-400 dark:border-red-500/20',
     LOAN_OFFICER: 'bg-blue-500/10 text-blue-600 border border-blue-200 dark:text-blue-400 dark:border-blue-500/20',
     CREDIT_MANAGER: 'bg-violet-500/10 text-violet-600 border border-violet-200 dark:text-violet-400 dark:border-violet-500/20',
+    BORROWER: 'bg-emerald-500/10 text-emerald-600 border border-emerald-200 dark:text-emerald-400 dark:border-emerald-500/20',
   };
+
 
   const Sidebar = (
     <aside className="w-60 bg-white dark:bg-[#0f1117] border-r border-slate-200 dark:border-white/[0.06] flex flex-col h-full">

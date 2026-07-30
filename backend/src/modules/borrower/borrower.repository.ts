@@ -10,7 +10,9 @@ export interface CreateBorrowerInput {
   guarantorName: string;
   guarantorPhone: string;
   photo?: string;
+  passwordHash?: string;
 }
+
 
 export interface UpdateBorrowerInput {
   fullName?: string;

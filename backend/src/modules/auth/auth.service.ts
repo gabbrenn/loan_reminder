@@ -16,36 +16,65 @@ export class AuthService {
 
   async login(email: string, passwordPlain: string) {
     const user = await this.authRepository.findByEmail(email);
-    if (!user) {
+    if (user) {
+      const isMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
+      if (!isMatch) {
+        throw new Error('Invalid email or password');
+      }
+      const { passwordHash, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    }
+
+    // Check borrower table if user not found in users table
+    const borrower = await this.authRepository.findBorrowerByEmail(email);
+    if (!borrower || !borrower.passwordHash) {
       throw new Error('Invalid email or password');
     }
 
-    const isMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
+    const isMatch = await bcrypt.compare(passwordPlain, borrower.passwordHash);
     if (!isMatch) {
       throw new Error('Invalid email or password');
     }
 
-    const { passwordHash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      id: borrower.id,
+      email: borrower.email,
+      name: borrower.fullName,
+      role: 'BORROWER' as const,
+      createdAt: borrower.createdAt,
+    };
   }
 
   async changePassword(userId: string, oldPasswordPlain: string, newPasswordPlain: string) {
     const user = await this.authRepository.findById(userId);
-    if (!user) {
+    if (user) {
+      const isMatch = await bcrypt.compare(oldPasswordPlain, user.passwordHash);
+      if (!isMatch) {
+        throw new Error('Invalid current password');
+      }
+      if (newPasswordPlain.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+      const newPasswordHash = await bcrypt.hash(newPasswordPlain, 10);
+      await this.authRepository.updatePassword(userId, newPasswordHash);
+      return true;
+    }
+
+    const borrower = await this.authRepository.findBorrowerById(userId);
+    if (!borrower || !borrower.passwordHash) {
       throw new Error('User not found');
     }
 
-    const isMatch = await bcrypt.compare(oldPasswordPlain, user.passwordHash);
+    const isMatch = await bcrypt.compare(oldPasswordPlain, borrower.passwordHash);
     if (!isMatch) {
       throw new Error('Invalid current password');
     }
-
     if (newPasswordPlain.length < 6) {
       throw new Error('New password must be at least 6 characters long');
     }
 
     const newPasswordHash = await bcrypt.hash(newPasswordPlain, 10);
-    await this.authRepository.updatePassword(userId, newPasswordHash);
+    await this.authRepository.updateBorrowerPassword(userId, newPasswordHash);
     return true;
   }
 
@@ -69,29 +98,42 @@ export class AuthService {
 
   async forgotPassword(email: string) {
     const user = await this.authRepository.findByEmail(email);
-    // Always respond with success even if user not found — prevents email enumeration
-    if (!user) return;
+    let targetUserId = user?.id;
+    let targetName = user?.name;
+    let targetEmail = user?.email;
+
+    if (!user) {
+      const borrower = await this.authRepository.findBorrowerByEmail(email);
+      if (borrower) {
+        targetUserId = borrower.id;
+        targetName = borrower.fullName;
+        targetEmail = borrower.email;
+      }
+    }
+
+    // Always respond with success even if user/borrower not found — prevents email enumeration
+    if (!targetUserId || !targetEmail || !targetName) return;
 
     // Invalidate any previous unused tokens
-    await this.authRepository.invalidateUserResetTokens(user.id);
+    await this.authRepository.invalidateUserResetTokens(targetUserId);
 
     // Generate a secure random token
     const rawToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
-    await this.authRepository.createResetToken(user.id, rawToken, expiresAt);
+    await this.authRepository.createResetToken(targetUserId, rawToken, expiresAt);
 
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
     // Send email via notify SDK
-    await sendEmail('email', user.email, RESET_TEMPLATE_ID, {
-      name: user.name,
+    await sendEmail('email', targetEmail, RESET_TEMPLATE_ID, {
+      name: targetName,
       resetLink,
       expiryMinutes: RESET_TOKEN_EXPIRY_MINUTES,
       subject: 'Password Reset Request — LoanReminder',
       previewText: 'Click the link below to reset your password.',
       body: `
-        <p>Hello <strong>${user.name}</strong>,</p>
+        <p>Hello <strong>${targetName}</strong>,</p>
         <p>You requested to reset your password. Click the button below to set a new password. This link is valid for <strong>${RESET_TOKEN_EXPIRY_MINUTES} minutes</strong>.</p>
         <p style="text-align:center;margin:32px 0;">
           <a href="${resetLink}" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Reset Password</a>
@@ -124,9 +166,15 @@ export class AuthService {
     }
 
     const newPasswordHash = await bcrypt.hash(newPasswordPlain, 10);
-    await this.authRepository.updatePassword(record.userId, newPasswordHash);
+    const user = await this.authRepository.findById(record.userId);
+    if (user) {
+      await this.authRepository.updatePassword(record.userId, newPasswordHash);
+    } else {
+      await this.authRepository.updateBorrowerPassword(record.userId, newPasswordHash);
+    }
     await this.authRepository.markResetTokenUsed(record.id);
 
     return true;
   }
 }
+

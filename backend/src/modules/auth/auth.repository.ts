@@ -7,8 +7,20 @@ export class AuthRepository {
     });
   }
 
+  async findBorrowerByEmail(email: string) {
+    return prisma.borrower.findUnique({
+      where: { email },
+    });
+  }
+
   async findById(id: string) {
     return prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  async findBorrowerById(id: string) {
+    return prisma.borrower.findUnique({
       where: { id },
     });
   }
@@ -19,6 +31,14 @@ export class AuthRepository {
       data: { passwordHash },
     });
   }
+
+  async updateBorrowerPassword(id: string, passwordHash: string) {
+    return prisma.borrower.update({
+      where: { id },
+      data: { passwordHash },
+    });
+  }
+
 
   async updateProfile(id: string, data: { email?: string; name?: string }) {
     return prisma.user.update({

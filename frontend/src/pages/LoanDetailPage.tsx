@@ -35,11 +35,48 @@ export const LoanDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [recording, setRecording] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const loadMessages = async () => {
+    if (!id) return;
+    setChatLoading(true);
+    try {
+      const res = await api.messages.getLoanMessages(id);
+      setMessages(res.messages || []);
+    } catch (err) {
+      console.error('Failed to load messages', err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showChat && id) {
+      loadMessages();
+      const interval = setInterval(loadMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [showChat, id]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !newMessage.trim()) return;
+    setSendingMsg(true);
+    try {
+      await api.messages.sendMessage(id, newMessage.trim());
+      setNewMessage('');
+      await loadMessages();
+    } catch (err: any) {
+      alert(err.message || 'Failed to send message');
+    } finally {
+      setSendingMsg(false);
+    }
+  };
+
 
   const canWrite = user?.role === 'ADMIN' || user?.role === 'LOAN_OFFICER';
   const canSetStatus = user?.role === 'ADMIN' || user?.role === 'CREDIT_MANAGER';
@@ -130,22 +167,38 @@ export const LoanDetailPage: React.FC = () => {
               Issued to <span className="text-slate-800 dark:text-slate-200 font-medium">{loan.borrower.fullName}</span>
             </p>
           </div>
-          {canSetStatus && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">Override status:</span>
-              <select
-                onChange={(e) => handleStatusChange(e.target.value)}
-                value=""
-                className="bg-slate-50 dark:bg-[#161b27] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-500/60 transition-colors"
-              >
-                <option value="" disabled>
-                  Select status
-                </option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="DEFAULTED">DEFAULTED</option>
-              </select>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setShowChat(true);
+                loadMessages();
+              }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-medium py-1.5 px-3.5 rounded-md text-xs transition-colors shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {user?.role === 'BORROWER' ? 'Contact Loan Officer' : 'Loan Messages'}
+            </button>
+
+            {canSetStatus && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Override status:</span>
+                <select
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  value=""
+                  className="bg-slate-50 dark:bg-[#161b27] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-500/60 transition-colors"
+                >
+                  <option value="" disabled>
+                    Select status
+                  </option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="DEFAULTED">DEFAULTED</option>
+                </select>
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* Repayment progress */}
@@ -357,6 +410,92 @@ export const LoanDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Chat Modal / Drawer */}
+      {showChat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.08] rounded-lg shadow-xl w-full max-w-lg flex flex-col h-[550px] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-white/[0.08] flex items-center justify-between bg-slate-50 dark:bg-[#161b27]">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Loan Conversation — {loan.loanNumber}</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {user?.role === 'BORROWER'
+                    ? `Assigned Officer: ${loan.createdBy?.name || 'Loan Officer'}`
+                    : `Borrower: ${loan.borrower.fullName}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowChat(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-semibold p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Message Thread */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50 dark:bg-[#0c0e13]">
+              {chatLoading && messages.length === 0 ? (
+                <div className="flex justify-center py-10">
+                  <Spinner />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs">
+                  No messages yet. Send a message to start the conversation regarding loan {loan.loanNumber}.
+                </div>
+              ) : (
+                messages.map((m: any) => {
+                  const isMine =
+                    (user?.role === 'BORROWER' && m.senderType === 'BORROWER') ||
+                    (user?.role !== 'BORROWER' && m.senderType === 'LOAN_OFFICER');
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed ${
+                          isMine
+                            ? 'bg-blue-600 text-white rounded-br-none'
+                            : 'bg-white dark:bg-[#161b27] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/[0.08] rounded-bl-none shadow-sm'
+                        }`}
+                      >
+                        <p>{m.message}</p>
+                      </div>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 px-1">
+                        {m.senderType === 'BORROWER' ? 'Borrower' : 'Loan Officer'} &bull;{' '}
+                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input Form */}
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0f1117] flex items-center gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1 bg-slate-50 dark:bg-[#161b27] border border-slate-200 dark:border-white/[0.08] text-slate-900 dark:text-slate-100 text-xs rounded-md px-3 py-2 focus:outline-none focus:border-blue-500"
+                required
+              />
+              <button
+                type="submit"
+                disabled={sendingMsg || !newMessage.trim()}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-4 py-2 rounded-md transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                {sendingMsg ? 'Sending...' : 'Send'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
