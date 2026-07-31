@@ -4,9 +4,10 @@ import { DashboardService } from './dashboard.service';
 const service = new DashboardService();
 
 export class DashboardController {
-  async getMetrics(_request: FastifyRequest, reply: FastifyReply) {
+  async getMetrics(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const data = await service.getDashboardMetrics();
+      const userPayload = request.user as any;
+      const data = await service.getDashboardMetrics(userPayload);
       return reply.code(200).send(data);
     } catch (error: any) {
       return reply.code(500).send({

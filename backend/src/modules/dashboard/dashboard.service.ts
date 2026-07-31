@@ -9,16 +9,22 @@ export class DashboardService {
     this.repo = new DashboardRepository();
   }
 
-  async getDashboardMetrics() {
+  async getDashboardMetrics(userPayload?: { id: string; role: string }) {
     const nowKigali = DateTime.now().setZone('Africa/Kigali');
     const startOfDay = nowKigali.startOf('day').toJSDate();
     const endOfDay = nowKigali.endOf('day').toJSDate();
 
+    const isBorrower = userPayload?.role === 'BORROWER';
+
     // 1. Fetch counts from repo
-    const totalBorrowers = await this.repo.getBorrowerCount();
-    const activeLoans = await this.repo.getActiveLoanCount();
-    const notificationsSentToday = await this.repo.getNotificationCountToday(startOfDay, endOfDay);
-    const allLoans = await this.repo.getAllLoansWithSchedules();
+    const totalBorrowers = isBorrower ? 1 : await this.repo.getBorrowerCount();
+    const rawLoans = await this.repo.getAllLoansWithSchedules();
+    const allLoans = isBorrower ? rawLoans.filter((l) => l.borrowerId === userPayload?.id) : rawLoans;
+    const activeLoans = isBorrower
+      ? allLoans.filter((l) => l.status === LoanStatus.ACTIVE).length
+      : await this.repo.getActiveLoanCount();
+    const notificationsSentToday = isBorrower ? 0 : await this.repo.getNotificationCountToday(startOfDay, endOfDay);
+
 
     let dueToday = 0;
     let dueThisWeek = 0;
