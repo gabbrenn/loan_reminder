@@ -7,6 +7,7 @@ This document is a step-by-step walkthrough to test every feature of the **Due D
 ## 1. Quick Start / Environment Credentials
 
 ### Base URLs
+- **Hosted App**: `https://loan-reminder-one.vercel.app`
 - **Frontend App**: `http://localhost:5173`
 - **Backend API**: `http://localhost:3000` (or `http://localhost:3005`)
 
