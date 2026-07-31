@@ -50,9 +50,8 @@ Live Production URL: [https://loan-reminder-one.vercel.app](https://loan-reminde
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/loan_reminder?schema=public"
 JWT_SECRET="super-secret-key-12345-loan-reminder"
 FRONTEND_URL="http://localhost:5173"
-NOTIFY_KEY="sk_ea9c1db04eb7c2f000dbd002dd641e5c9dba92da7683129f9e60e43668673dcb"
-NOTIFY_API_URL="https://notifyapi.qa.afrisinc.com/api/notify/send"
-REMINDER_TEMPLATE="c72c6e7f-ba37-4047-b31a-7eff74b55662"
+NOTIFY_KEY="sk_96f46c734e00e32639d9699535abb22bf77aad8f84fa99ea8b237ab468a7cdf9"
+NOTIFY_API_URL="https://notify-api.afrisinc.com/api/notify/send"
 ```
 
 #### Frontend `.env` (`frontend/.env`)
