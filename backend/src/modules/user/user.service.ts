@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import { UserRepository } from './user.repository';
 import { Role } from '@prisma/client';
+import { AuthService } from '../auth/auth.service';
+
+const authService = new AuthService();
 
 export class UserService {
   private repo: UserRepository;
@@ -25,13 +28,23 @@ export class UserService {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
-    return this.repo.create({
+    const user = await this.repo.create({
       email: data.email,
       name: data.name,
       passwordHash,
       role: data.role,
     });
+
+    // Send welcome email with a password-reset link so the new user can set their own password
+    try {
+      await authService.forgotPassword(user.email);
+    } catch (err) {
+      console.error('Failed to send welcome email to new user:', err);
+    }
+
+    return user;
   }
+
 
   async updateUser(
     id: string,
