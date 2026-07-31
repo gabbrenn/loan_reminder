@@ -43,7 +43,16 @@ export class LoanController {
     reply: FastifyReply
   ) {
     try {
+      const userPayload = request.user as any;
       const loan = await service.getLoan(request.params.id);
+
+      // Borrowers can only view their own loans
+      if (userPayload?.role === 'BORROWER' && loan.borrowerId !== userPayload?.id) {
+        return reply.code(403).send({
+          error: { message: 'Forbidden: You can only view your own loans', code: 'FORBIDDEN' },
+        });
+      }
+
       return reply.code(200).send(loan);
     } catch (error: any) {
       const status = error.message === 'Loan not found' ? 404 : 400;
@@ -63,7 +72,15 @@ export class LoanController {
     reply: FastifyReply
   ) {
     try {
-      const loans = await service.listLoans(request.query);
+      const userPayload = request.user as any;
+      const query = { ...request.query };
+
+      // Borrowers can only see their own loans — override any borrowerId filter
+      if (userPayload?.role === 'BORROWER') {
+        query.borrowerId = userPayload.id;
+      }
+
+      const loans = await service.listLoans(query);
       return reply.code(200).send(loans);
     } catch (error: any) {
       return reply.code(500).send({

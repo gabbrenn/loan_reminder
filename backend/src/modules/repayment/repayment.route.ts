@@ -4,7 +4,8 @@ import { authorize } from '../../middleware/auth.middleware';
 
 const controller = new RepaymentController();
 
-const READ_ROLES = ['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER'] as const;
+const READ_ROLES = ['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER', 'BORROWER'] as const;
+
 const WRITE_ROLES = ['ADMIN', 'LOAN_OFFICER'] as const;
 
 export async function repaymentRoutes(fastify: FastifyInstance) {
