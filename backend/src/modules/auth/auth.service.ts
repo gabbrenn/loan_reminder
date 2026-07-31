@@ -5,7 +5,7 @@ import { sendEmail } from '../../lib/notify';
 
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
 const RESET_TEMPLATE_ID = process.env.RESET_PASSWORD_TEMPLATE || process.env.REMINDER_TEMPLATE || '';
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+const APP_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 export class AuthService {
   private authRepository: AuthRepository;
