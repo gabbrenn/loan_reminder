@@ -1,7 +1,7 @@
 import { BorrowerRepository, CreateBorrowerInput, UpdateBorrowerInput } from './borrower.repository';
 import { AuditService } from '../audit/audit.service';
 import bcrypt from 'bcrypt';
-import { sendEmail } from '../../lib/notify';
+
 import { AuthService } from '../auth/auth.service';
 
 const auditService = new AuditService();

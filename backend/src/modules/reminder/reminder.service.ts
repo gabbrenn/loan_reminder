@@ -2,8 +2,8 @@ import { ReminderRepository } from './reminder.repository';
 import { ReminderType, NotificationChannel, NotificationStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { SettingsService } from '../settings/settings.service';
-import notify from '../../lib/notify';
 import { sendEmail } from '../../lib/notify';
+
 
 const settingsService = new SettingsService();
 
