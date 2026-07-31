@@ -1,8 +1,11 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { RepaymentService } from './repayment.service';
 import { PaymentMethod } from '@prisma/client';
+import { LoanService } from '../loan/loan.service';
 
 const service = new RepaymentService();
+const loanService = new LoanService();
+
 
 export class RepaymentController {
   async record(
@@ -40,8 +43,6 @@ export class RepaymentController {
 
       // Borrowers can only view repayments for their own loans
       if (userPayload?.role === 'BORROWER') {
-        const { LoanService } = await import('../loan/loan.service');
-        const loanService = new LoanService();
         const loan = await loanService.getLoan(request.params.loanId);
         if (!loan || loan.borrowerId !== userPayload.id) {
           return reply.code(403).send({
@@ -49,6 +50,7 @@ export class RepaymentController {
           });
         }
       }
+
 
 
       return reply.code(200).send(history);
