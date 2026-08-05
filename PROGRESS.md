@@ -221,7 +221,36 @@ This file tracks the development progress of the MVP according to the build orde
 
 ---
 
+### 22. Consolidated Borrower Reminder Notifications & Single Physical Dispatch
+- [x] **Consolidated Email & SMS Templates (`emailTemplates.ts`)**:
+  - `consolidatedBorrowerReminder`: Responsive HTML template rendering a combined digest table of all due/overdue installments for a borrower, total combined balance due, and color-coded status badges.
+  - `consolidatedBorrowerSMS`: Text message formatter combining multiple installment amounts and loan numbers into a concise SMS string.
+- [x] **Deduplicated Queue Dispatch (`reminder.service.ts`)**:
+  - `processQueue()` groups pending notifications by recipient (`email` / `phone`) and channel (`EMAIL` / `SMS`).
+  - Ensures **exactly 1 physical email** and **exactly 1 physical SMS** is dispatched per borrower per engine run, regardless of how many installments are listed in the digest.
+  - Updates status for all individual schedule logs linked to the consolidated digest.
+- [x] **Presentation Force Mode (`reminder.route.ts`)**:
+  - `POST /api/v1/reminders/trigger?force=true`: Optional `force=true` query parameter added so manual triggers during live presentations can force resending consolidated notifications even on the same day.
+- [x] **Tests Passing**: Verified with clean test execution.
+
+---
+
 ## Decisions Made
-- Idempotency per spec: one notification per `(repaymentScheduleId, reminderType, channel)` per calendar day (Africa/Kigali). FAILED logs count as "already attempted today" and block re-queuing until the next day's cron run (AGENTS.md §6: "One retry on the next day's cron run is enough for V1").
-- `notify.ts` `sendEmail` errors are swallowed (logged to console, return null) — the caller handles the FAILED status update separately.
+- Centralized reusable, responsive HTML email templates with inline CSS styling in `src/lib/emailTemplates.ts`.
+- Grouped pending notifications by `borrowerId` during reminder engine runs to send 1 combined email and 1 combined SMS per borrower per day.
+- Preserved automated daily cron execution as well as idempotency checks per schedule item.
+- Created reusable Africa's Talking SMS utility in `src/lib/africastalking.ts` (`AfricasTalkingUtility`, `sendSMS`) supporting both single and bulk SMS dispatch via Africa's Talking REST API with configurable environment variables (`AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, `AFRICASTALKING_SENDER_ID`).
+
+---
+
+### 23. Reusable Africa's Talking SMS Utility
+- [x] **Created `src/lib/africastalking.ts`**:
+  - Implemented `AfricasTalkingUtility` class and exported singleton `africastalking` instance.
+  - Implemented `sendSMS(to, message, from)` helper function supporting single or array recipient phone numbers.
+  - Automated sandbox vs production base URL switching (`api.sandbox.africastalking.com` vs `api.africastalking.com`).
+  - Added environment variable configuration in `.env` (`AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, `AFRICASTALKING_SENDER_ID`).
+  - Strongly typed request options (`SendSMSOptions`) and response interfaces (`ATSendSMSResponse`, `ATRecipientResult`).
+
+
+
 

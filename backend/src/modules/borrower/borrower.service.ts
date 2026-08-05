@@ -41,7 +41,7 @@ export class BorrowerService {
 
     // Send account registration email with link to reset/set password
     try {
-      await authService.forgotPassword(borrower.email);
+      await authService.sendBorrowerWelcomeEmail(borrower.id, defaultPassword);
     } catch (err) {
       // Best-effort email notification
       console.error('Failed to send borrower welcome email:', err);

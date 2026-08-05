@@ -2,6 +2,7 @@ import { AuthRepository } from './auth.repository';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { sendEmail } from '../../lib/notify';
+import { emailTemplates } from '../../lib/emailTemplates';
 
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
 const RESET_TEMPLATE_ID = process.env.RESET_PASSWORD_TEMPLATE || process.env.REMINDER_TEMPLATE || '';
@@ -127,18 +128,63 @@ export class AuthService {
 
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
-    // Send email via notify SDK
+    // Send email via notify SDK using modern HTML template
     await sendEmail('EMAIL', targetEmail, {
+      message: emailTemplates.forgotPassword({
+        name: targetName,
+        resetLink,
+        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+      }),
+    });
+  }
 
-      message: `
-        <p>Hello <strong>${targetName}</strong>,</p>
-        <p>You requested to reset your password. Click the button below to set a new password. This link is valid for <strong>${RESET_TOKEN_EXPIRY_MINUTES} minutes</strong>.</p>
-        <p style="text-align:center;margin:32px 0;">
-          <a href="${resetLink}" style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Reset Password</a>
-        </p>
-        <p>If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
-        <p style="color:#94a3b8;font-size:12px;">This link expires in ${RESET_TOKEN_EXPIRY_MINUTES} minutes.</p>
-      `,
+  // ─── Welcome Emails for New Accounts ──────────────────────────────────────
+
+  async sendUserWelcomeEmail(userId: string, role: string, temporaryPassword?: string) {
+    const user = await this.authRepository.findById(userId);
+    if (!user) return;
+
+    await this.authRepository.invalidateUserResetTokens(userId, false);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+    await this.authRepository.createResetToken(userId, false, rawToken, expiresAt);
+    const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
+
+    await sendEmail('EMAIL', user.email, {
+      message: emailTemplates.userWelcome({
+        name: user.name,
+        email: user.email,
+        role,
+        resetLink,
+        temporaryPassword,
+        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+      }),
+    });
+  }
+
+  async sendBorrowerWelcomeEmail(borrowerId: string, temporaryPassword: string = 'Borrower123!') {
+    const borrower = await this.authRepository.findBorrowerById(borrowerId);
+    if (!borrower) return;
+
+    await this.authRepository.invalidateUserResetTokens(borrowerId, true);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+    await this.authRepository.createResetToken(borrowerId, true, rawToken, expiresAt);
+    const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
+
+    await sendEmail('EMAIL', borrower.email, {
+      message: emailTemplates.borrowerWelcome({
+        name: borrower.fullName,
+        email: borrower.email,
+        role: 'BORROWER',
+        resetLink,
+        temporaryPassword,
+        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+      }),
     });
   }
 

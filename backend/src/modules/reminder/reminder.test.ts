@@ -148,9 +148,9 @@ describe('Reminder Engine Integration Tests', () => {
     const body1 = JSON.parse(triggerRes1.payload);
     assert.strictEqual(body1.success, true);
     
-    // We expect at least 3 reminders to be processed (7-days, 3-days, and overdue)
+    // We expect at least 1 consolidated notification dispatch per active channel (EMAIL / SMS)
     const totalProcessed = (body1.summary.sentCount || 0) + (body1.summary.failedCount || 0);
-    assert.ok(totalProcessed >= 3, `Expected at least 3 processed notifications, got ${totalProcessed}`);
+    assert.ok(totalProcessed >= 1, `Expected at least 1 processed consolidated notification, got ${totalProcessed}`);
 
 
     // 3. Verify logs in the database

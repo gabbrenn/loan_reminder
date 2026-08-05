@@ -3,9 +3,21 @@ import { ReminderType, NotificationChannel, NotificationStatus } from '@prisma/c
 import { DateTime } from 'luxon';
 import { SettingsService } from '../settings/settings.service';
 import { sendEmail } from '../../lib/notify';
-
+import { emailTemplates } from '../../lib/emailTemplates';
 
 const settingsService = new SettingsService();
+
+interface PendingBorrowerReminderItem {
+  schedule: any;
+  reminderType: ReminderType;
+  dueKigali: DateTime;
+  diffDays: number;
+  amountRemaining: number;
+  isOverdue: boolean;
+  statusText: string;
+  needEmail: boolean;
+  needSMS: boolean;
+}
 
 export class ReminderService {
   private repo: ReminderRepository;
@@ -14,7 +26,7 @@ export class ReminderService {
     this.repo = new ReminderRepository();
   }
 
-  async runReminderEngine() {
+  async runReminderEngine(force: boolean = false) {
     // 1. Fetch system settings
     const settings = await settingsService.getSettings();
 
@@ -26,9 +38,20 @@ export class ReminderService {
     let sentCount = 0;
     let failedCount = 0;
 
+    // Group items by borrowerId
+    const borrowerMap = new Map<
+      string,
+      {
+        borrower: any;
+        items: PendingBorrowerReminderItem[];
+      }
+    >();
+
     for (const schedule of unpaidSchedules) {
       totalChecked++;
       const borrower = schedule.loan.borrower;
+      if (!borrower) continue;
+
       const dueKigali = DateTime.fromJSDate(schedule.dueDate).setZone('Africa/Kigali').startOf('day');
       const diffDays = Math.round(dueKigali.diff(todayKigali, 'days').days);
 
@@ -42,8 +65,7 @@ export class ReminderService {
       } else if (diffDays === settings.reminderDaysBefore3) {
         reminderType = ReminderType.BEFORE_1_DAY;
       } else if (diffDays < 0) {
-        // Implement Grace Period logic:
-        // Installment only becomes OVERDUE if overdue days exceed grace period
+        // Grace Period logic
         const gracePassed = Math.abs(diffDays) > schedule.loan.gracePeriodDays;
         if (gracePassed) {
           reminderType = ReminderType.OVERDUE;
@@ -52,160 +74,123 @@ export class ReminderService {
 
       if (!reminderType) continue;
 
-      // 1. Process EMAIL
-      const alreadySentEmail = await this.repo.hasReminderBeenSent({
-        repaymentScheduleId: schedule.id,
+      let needEmail = true;
+      let needSMS = true;
+
+      // If not forced (e.g. automated cron run), check idempotency
+      if (!force) {
+        const [alreadySentEmail, alreadySentSMS] = await Promise.all([
+          this.repo.hasReminderBeenSent({
+            repaymentScheduleId: schedule.id,
+            reminderType,
+            channel: NotificationChannel.EMAIL,
+          }),
+          this.repo.hasReminderBeenSent({
+            repaymentScheduleId: schedule.id,
+            reminderType,
+            channel: NotificationChannel.SMS,
+          }),
+        ]);
+
+        needEmail = !alreadySentEmail;
+        needSMS = !alreadySentSMS;
+      }
+
+      if (!needEmail && !needSMS) continue;
+
+      const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
+      const isOverdue = reminderType === ReminderType.OVERDUE;
+      const statusText = isOverdue
+        ? 'OVERDUE'
+        : diffDays === 1
+        ? 'Due Tomorrow'
+        : `Due in ${diffDays} days`;
+
+      if (!borrowerMap.has(borrower.id)) {
+        borrowerMap.set(borrower.id, { borrower, items: [] });
+      }
+
+      borrowerMap.get(borrower.id)!.items.push({
+        schedule,
         reminderType,
-        channel: NotificationChannel.EMAIL,
+        dueKigali,
+        diffDays,
+        amountRemaining,
+        isOverdue,
+        statusText,
+        needEmail,
+        needSMS,
       });
+    }
 
-      if (!alreadySentEmail) {
-        const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
-        const formattedDueDate = dueKigali.toFormat('dd LLL yyyy');
-        let emailBody = '';
+    // 2. Create consolidated notifications per borrower
+    for (const [borrowerId, { borrower, items }] of borrowerMap.entries()) {
+      const emailItems = items.filter((i) => i.needEmail);
+      const smsItems = items.filter((i) => i.needSMS);
 
-        if (reminderType === ReminderType.OVERDUE) {
-          emailBody = `
-<div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f4f6f9; padding: 30px 20px; color: #333;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); border: 1px solid #e1e4e8;">
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #e74c3c, #c0392b); padding: 30px; text-align: center;">
-      <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">⚠️ OVERDUE PAYMENT NOTICE</h1>
-    </div>
-    
-    <!-- Content -->
-    <div style="padding: 30px; line-height: 1.6;">
-      <p style="margin: 0 0 15px 0; font-size: 16px; color: #2c3e50;">Dear <strong>${borrower.fullName}</strong>,</p>
-      <p style="margin: 0 0 20px 0; font-size: 15px; color: #555;">This is an urgent notification that your loan installment is currently <strong>OVERDUE</strong>. Please review the details below and arrange for payment immediately to avoid penalties or default status.</p>
-      
-      <!-- Details Card -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; background-color: #fdfefe; border: 1px solid #eaeded; border-radius: 6px;">
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Loan Number</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right; font-weight: 700;">${schedule.loan.loanNumber}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Installment No.</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right;">${schedule.installmentNumber}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Original Due Date</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right;">${formattedDueDate}</td>
-        </tr>
-        <tr>
-          <td style="padding: 15px; font-size: 15px; color: #c0392b; font-weight: bold;">Amount Outstanding</td>
-          <td style="padding: 15px; font-size: 18px; color: #c0392b; text-align: right; font-weight: 800;">RWF ${amountRemaining.toLocaleString()}</td>
-        </tr>
-      </table>
+      // Consolidated EMAIL (Exactly 1 email per borrower)
+      if (emailItems.length > 0) {
+        const emailBody = emailTemplates.consolidatedBorrowerReminder({
+          borrowerName: borrower.fullName,
+          items: emailItems.map((i) => ({
+            loanNumber: i.schedule.loan.loanNumber,
+            installmentNumber: i.schedule.installmentNumber,
+            dueDate: i.dueKigali.toFormat('dd LLL yyyy'),
+            amountRemaining: i.amountRemaining,
+            isOverdue: i.isOverdue,
+            statusText: i.statusText,
+          })),
+        });
 
-      <!-- Callout Banner -->
-      <div style="background-color: #fdf2f2; border-left: 4px solid #ec7063; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
-        <p style="margin: 0; font-size: 14px; color: #c0392b; font-weight: 500;">
-          Please settle this outstanding balance immediately. If you have already made this payment, please contact your loan officer or provide a payment receipt.
-        </p>
-      </div>
-
-      <p style="margin: 0 0 5px 0; font-size: 15px; color: #333;">Thank you for your prompt attention to this matter.</p>
-      <p style="margin: 0; font-size: 15px; color: #7f8c8d;">Sincerely,<br/><strong style="color: #2c3e50;">Lending Team</strong></p>
-    </div>
-
-    <!-- Footer -->
-    <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eeeeee; font-size: 12px; color: #95a5a6;">
-      <p style="margin: 0 0 5px 0;">This is an automated system notification. Please do not reply directly to this email.</p>
-      <p style="margin: 0;">&copy; ${new Date().getFullYear()} MFI Loan Alert System. All rights reserved.</p>
-    </div>
-  </div>
-</div>
-`;
-        } else {
-          const daysText = diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
-          emailBody = `
-<div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #f4f6f9; padding: 30px 20px; color: #333;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); border: 1px solid #e1e4e8;">
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #3498db, #2980b9); padding: 30px; text-align: center;">
-      <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">📅 UPCOMING PAYMENT REMINDER</h1>
-    </div>
-    
-    <!-- Content -->
-    <div style="padding: 30px; line-height: 1.6;">
-      <p style="margin: 0 0 15px 0; font-size: 16px; color: #2c3e50;">Dear <strong>${borrower.fullName}</strong>,</p>
-      <p style="margin: 0 0 20px 0; font-size: 15px; color: #555;">This is a friendly reminder that you have an upcoming loan repayment scheduled <strong>${daysText}</strong>. Please find the details of the installment below:</p>
-      
-      <!-- Details Card -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; background-color: #fdfefe; border: 1px solid #eaeded; border-radius: 6px;">
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Loan Number</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right; font-weight: 700;">${schedule.loan.loanNumber}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Installment No.</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right;">${schedule.installmentNumber}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f2f4f4;">
-          <td style="padding: 12px 15px; font-size: 14px; color: #7f8c8d; font-weight: 600;">Due Date</td>
-          <td style="padding: 12px 15px; font-size: 14px; color: #2c3e50; text-align: right;">${formattedDueDate}</td>
-        </tr>
-        <tr>
-          <td style="padding: 15px; font-size: 15px; color: #2980b9; font-weight: bold;">Amount Due</td>
-          <td style="padding: 15px; font-size: 18px; color: #2980b9; text-align: right; font-weight: 800;">RWF ${amountRemaining.toLocaleString()}</td>
-        </tr>
-      </table>
-
-      <!-- Callout Banner -->
-      <div style="background-color: #ebf5fb; border-left: 4px solid #5dade2; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
-        <p style="margin: 0; font-size: 14px; color: #2980b9; font-weight: 500;">
-          Please ensure that you have sufficient funds to cover this installment by the due date. Thank you for your cooperation.
-        </p>
-      </div>
-
-      <p style="margin: 0 0 5px 0; font-size: 15px; color: #333;">If you have any questions, please contact your loan officer.</p>
-      <p style="margin: 0; font-size: 15px; color: #7f8c8d;">Best regards,<br/><strong style="color: #2c3e50;">Lending Team</strong></p>
-    </div>
-
-    <!-- Footer -->
-    <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eeeeee; font-size: 12px; color: #95a5a6;">
-      <p style="margin: 0 0 5px 0;">This is an automated system notification. Please do not reply directly to this email.</p>
-      <p style="margin: 0;">&copy; ${new Date().getFullYear()} MFI Loan Alert System. All rights reserved.</p>
-    </div>
-  </div>
-</div>
-`;
-        }
-
+        // Use the first schedule item as the primary anchor log for this consolidated email
+        const primaryItem = emailItems[0];
         await this.repo.createPendingNotification({
-          repaymentScheduleId: schedule.id,
-          reminderType,
+          repaymentScheduleId: primaryItem.schedule.id,
+          reminderType: primaryItem.reminderType,
           channel: NotificationChannel.EMAIL,
           message: emailBody,
         });
+
+        // For remaining schedules in this digest, record sent log directly if forced/needed without re-sending duplicate emails
+        for (let idx = 1; idx < emailItems.length; idx++) {
+          const item = emailItems[idx];
+          await this.repo.createPendingNotification({
+            repaymentScheduleId: item.schedule.id,
+            reminderType: item.reminderType,
+            channel: NotificationChannel.EMAIL,
+            message: emailBody,
+          });
+        }
       }
 
-      // 2. Process SMS
-      const alreadySentSMS = await this.repo.hasReminderBeenSent({
-        repaymentScheduleId: schedule.id,
-        reminderType,
-        channel: NotificationChannel.SMS,
-      });
+      // Consolidated SMS (Exactly 1 SMS per borrower)
+      if (smsItems.length > 0) {
+        const smsBody = emailTemplates.consolidatedBorrowerSMS({
+          items: smsItems.map((i) => ({
+            loanNumber: i.schedule.loan.loanNumber,
+            amountRemaining: i.amountRemaining,
+            isOverdue: i.isOverdue,
+            statusText: i.statusText,
+          })),
+        });
 
-      if (!alreadySentSMS) {
-        const amountRemaining = Math.round((schedule.amountDue - schedule.amountPaid) * 100) / 100;
-        const formattedDueDate = dueKigali.toFormat('dd LLL yyyy');
-        let smsBody = '';
-
-        if (reminderType === ReminderType.OVERDUE) {
-          smsBody = `Urgent: Your installment of RWF ${amountRemaining.toLocaleString()} for Loan ${schedule.loan.loanNumber} is OVERDUE. Please pay immediately. - MFI Team`;
-        } else {
-          const daysText = diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`;
-          smsBody = `Reminder: Your installment of RWF ${amountRemaining.toLocaleString()} for Loan ${schedule.loan.loanNumber} is due ${daysText} (${formattedDueDate}). - MFI Team`;
-        }
-
+        const primaryItem = smsItems[0];
         await this.repo.createPendingNotification({
-          repaymentScheduleId: schedule.id,
-          reminderType,
+          repaymentScheduleId: primaryItem.schedule.id,
+          reminderType: primaryItem.reminderType,
           channel: NotificationChannel.SMS,
           message: smsBody,
         });
+
+        for (let idx = 1; idx < smsItems.length; idx++) {
+          const item = smsItems[idx];
+          await this.repo.createPendingNotification({
+            repaymentScheduleId: item.schedule.id,
+            reminderType: item.reminderType,
+            channel: NotificationChannel.SMS,
+            message: smsBody,
+          });
+        }
       }
     }
 
@@ -292,6 +277,10 @@ export class ReminderService {
     let sentCount = 0;
     let failedCount = 0;
 
+    // Deduplicate pending logs by (recipientEmail/phone, channel) so ONLY 1 physical message is dispatched per recipient per channel
+    const emailGroupMap = new Map<string, typeof pendingLogs>();
+    const smsGroupMap = new Map<string, typeof pendingLogs>();
+
     for (const log of pendingLogs) {
       const borrower = log.repaymentSchedule.loan.borrower;
       if (!borrower) {
@@ -314,30 +303,10 @@ export class ReminderService {
           failedCount++;
           continue;
         }
-
-        if (settings.emailEnabled) {
-          try {
-            await sendEmail('EMAIL', borrower.email, {
-              message: log.message || '',
-            });
-            await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
-            sentCount++;
-          } catch (err: any) {
-            await this.repo.updateNotificationStatus(
-              log.id,
-              NotificationStatus.FAILED,
-              err.message || 'Unknown notification error'
-            );
-            failedCount++;
-          }
-        } else {
-          await this.repo.updateNotificationStatus(
-            log.id,
-            NotificationStatus.FAILED,
-            'Email notifications are globally disabled in settings'
-          );
-          failedCount++;
+        if (!emailGroupMap.has(borrower.email)) {
+          emailGroupMap.set(borrower.email, []);
         }
+        emailGroupMap.get(borrower.email)!.push(log);
       } else if (log.channel === NotificationChannel.SMS) {
         if (!borrower.phone) {
           await this.repo.updateNotificationStatus(
@@ -348,30 +317,81 @@ export class ReminderService {
           failedCount++;
           continue;
         }
+        if (!smsGroupMap.has(borrower.phone)) {
+          smsGroupMap.set(borrower.phone, []);
+        }
+        smsGroupMap.get(borrower.phone)!.push(log);
+      }
+    }
 
-        if (settings.smsEnabled) {
-          try {
-            await sendEmail('SMS', borrower.phone, {
-              message: log.message || '',
-            });
-            await this.repo.updateNotificationStatus(log.id, NotificationStatus.SENT);
-            sentCount++;
-          } catch (err: any) {
+    // Process EMAIL dispatch (1 physical send per recipient email)
+    for (const [email, logs] of emailGroupMap.entries()) {
+      if (settings.emailEnabled) {
+        const primaryLog = logs[0];
+        try {
+          await sendEmail('EMAIL', email, {
+            message: primaryLog.message || '',
+          });
+
+          // Mark all linked logs as SENT
+          for (const l of logs) {
+            await this.repo.updateNotificationStatus(l.id, NotificationStatus.SENT);
+          }
+          sentCount++;
+        } catch (err: any) {
+          for (const l of logs) {
             await this.repo.updateNotificationStatus(
-              log.id,
+              l.id,
+              NotificationStatus.FAILED,
+              err.message || 'Unknown notification error'
+            );
+          }
+          failedCount++;
+        }
+      } else {
+        for (const l of logs) {
+          await this.repo.updateNotificationStatus(
+            l.id,
+            NotificationStatus.FAILED,
+            'Email notifications are globally disabled in settings'
+          );
+        }
+        failedCount++;
+      }
+    }
+
+    // Process SMS dispatch (1 physical send per recipient phone)
+    for (const [phone, logs] of smsGroupMap.entries()) {
+      if (settings.smsEnabled) {
+        const primaryLog = logs[0];
+        try {
+          await sendEmail('SMS', phone, {
+            message: primaryLog.message || '',
+          });
+
+          for (const l of logs) {
+            await this.repo.updateNotificationStatus(l.id, NotificationStatus.SENT);
+          }
+          sentCount++;
+        } catch (err: any) {
+          for (const l of logs) {
+            await this.repo.updateNotificationStatus(
+              l.id,
               NotificationStatus.FAILED,
               err.message || 'Unknown SMS notification error'
             );
-            failedCount++;
           }
-        } else {
+          failedCount++;
+        }
+      } else {
+        for (const l of logs) {
           await this.repo.updateNotificationStatus(
-            log.id,
+            l.id,
             NotificationStatus.FAILED,
             'SMS notifications are globally disabled in settings'
           );
-          failedCount++;
         }
+        failedCount++;
       }
     }
 

@@ -14,7 +14,9 @@ export async function reminderRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const summary = await service.runReminderEngine();
+        const query = (request.query as { force?: string | boolean }) || {};
+        const force = query.force === 'true' || query.force === true; // Only force if explicitly passed ?force=true
+        const summary = await service.runReminderEngine(force);
         return reply.code(200).send({
           success: true,
           message: 'Reminder engine triggered successfully',

@@ -37,7 +37,7 @@ export class UserService {
 
     // Send welcome email with a password-reset link so the new user can set their own password
     try {
-      await authService.forgotPassword(user.email);
+      await authService.sendUserWelcomeEmail(user.id, user.role, data.password);
     } catch (err) {
       console.error('Failed to send welcome email to new user:', err);
     }
