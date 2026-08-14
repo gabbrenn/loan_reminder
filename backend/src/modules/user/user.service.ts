@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { UserRepository } from './user.repository';
 import { Role } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
+import prisma from '../../lib/prisma';
 
 const authService = new AuthService();
 
@@ -22,9 +23,14 @@ export class UserService {
     password: string;
     role: Role;
   }) {
-    const existing = await this.repo.findByEmail(data.email);
-    if (existing) {
-      throw new Error('A user with this email address already exists');
+    const emailLower = data.email.trim().toLowerCase();
+    const [existingUser, existingBorrower] = await Promise.all([
+      prisma.user.findFirst({ where: { email: { equals: emailLower, mode: 'insensitive' } } }),
+      prisma.borrower.findFirst({ where: { email: { equals: emailLower, mode: 'insensitive' } } }),
+    ]);
+
+    if (existingUser || existingBorrower) {
+      throw new Error('A user or borrower with this email address already exists');
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);

@@ -6,6 +6,40 @@ const READ_ROLES = ['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER'] as const;
 const WRITE_ROLES = ['ADMIN', 'LOAN_OFFICER'] as const;
 
 export async function borrowerRoutes(fastify: FastifyInstance) {
+  // GET /api/v1/borrowers/template - Download borrower import CSV template
+  fastify.get(
+    '/template',
+    {
+      preHandler: [fastify.authenticate, authorize([...WRITE_ROLES])],
+    },
+    BorrowerController.downloadTemplate as any
+  );
+
+  // POST /api/v1/borrowers/import - Bulk import borrowers
+  fastify.post(
+    '/import',
+    {
+      preHandler: [fastify.authenticate, authorize([...WRITE_ROLES])],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['borrowers'],
+          properties: {
+            borrowers: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                required: ['fullName', 'nationalId', 'phone', 'email', 'address', 'occupation', 'guarantorName', 'guarantorPhone'],
+              },
+            },
+          },
+        },
+      },
+    },
+    BorrowerController.importBorrowers as any
+  );
+
   // POST /api/v1/borrowers - Create borrower
   fastify.post(
     '/',

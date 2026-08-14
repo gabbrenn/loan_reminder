@@ -93,7 +93,7 @@ export class AuthController {
       // Always 200 to prevent email enumeration
       return reply.code(200).send({
         success: true,
-        message: 'If that email exists, a reset link has been sent.',
+        message: 'If an account exists with that email or phone number, a reset link has been sent.',
       });
     } catch (error: any) {
       return reply.code(500).send({

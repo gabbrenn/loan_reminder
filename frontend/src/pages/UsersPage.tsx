@@ -210,7 +210,9 @@ export default function UsersPage() {
           {formError && <div className={`${alertError} mb-4`}>{formError}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className={labelCls}>Full Name</label>
+              <label className={labelCls}>
+                Full Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={form.name}
@@ -223,7 +225,9 @@ export default function UsersPage() {
             {!editUser && (
               <>
                 <div>
-                  <label className={labelCls}>Email Address</label>
+                  <label className={labelCls}>
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="email"
                     value={form.email}
@@ -234,7 +238,9 @@ export default function UsersPage() {
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Temporary Password</label>
+                  <label className={labelCls}>
+                    Temporary Password <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="password"
                     value={form.password}
@@ -248,7 +254,9 @@ export default function UsersPage() {
               </>
             )}
             <div>
-              <label className={labelCls}>Role</label>
+              <label className={labelCls}>
+                Role <span className="text-red-500">*</span>
+              </label>
               <select
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}

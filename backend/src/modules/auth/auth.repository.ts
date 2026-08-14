@@ -2,14 +2,37 @@ import prisma from '../../lib/prisma';
 
 export class AuthRepository {
   async findByEmail(email: string) {
-    return prisma.user.findUnique({
-      where: { email },
+    const emailLower = email.trim().toLowerCase();
+    return prisma.user.findFirst({
+      where: { email: { equals: emailLower, mode: 'insensitive' } },
     });
   }
 
   async findBorrowerByEmail(email: string) {
-    return prisma.borrower.findUnique({
-      where: { email },
+    const emailLower = email.trim().toLowerCase();
+    return prisma.borrower.findFirst({
+      where: { email: { equals: emailLower, mode: 'insensitive' } },
+    });
+  }
+
+  async findByIdentifier(identifier: string) {
+    const cleanId = identifier.trim();
+    return prisma.user.findFirst({
+      where: {
+        email: { equals: cleanId.toLowerCase(), mode: 'insensitive' },
+      },
+    });
+  }
+
+  async findBorrowerByIdentifier(identifier: string) {
+    const cleanId = identifier.trim();
+    return prisma.borrower.findFirst({
+      where: {
+        OR: [
+          { email: { equals: cleanId.toLowerCase(), mode: 'insensitive' } },
+          { phone: { equals: cleanId, mode: 'insensitive' } },
+        ],
+      },
     });
   }
 

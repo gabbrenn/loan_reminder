@@ -54,4 +54,30 @@ export const BorrowerController = {
       return reply.code(status).send({ error: { message: error.message, code: 'BAD_REQUEST' } });
     }
   },
+
+  async importBorrowers(request: FastifyRequest<{ Body: { borrowers: any[] } }>, reply: FastifyReply) {
+    try {
+      const actorId = (request as any).user?.id;
+      const borrowers = request.body?.borrowers || [];
+      if (!Array.isArray(borrowers) || borrowers.length === 0) {
+        return reply.code(400).send({
+          error: { message: 'No borrowers data provided for import', code: 'BAD_REQUEST' },
+        });
+      }
+      const result = await service.importBorrowers(borrowers, actorId);
+      return reply.code(200).send(result);
+    } catch (error: any) {
+      return reply.code(400).send({ error: { message: error.message, code: 'BAD_REQUEST' } });
+    }
+  },
+
+  async downloadTemplate(_request: FastifyRequest, reply: FastifyReply) {
+    const csvHeader = 'fullName,nationalId,phone,email,address,occupation,guarantorName,guarantorPhone,photo\n';
+    const sampleRow = 'Jean Paul Ndayishimiye,1199880011223344,+250788123456,jeanpaul@example.com,Kigali Nyarugenge,Entrepreneur,Marie Uwimana,+250788654321,\n';
+    
+    return reply
+      .header('Content-Type', 'text/csv')
+      .header('Content-Disposition', 'attachment; filename="borrowers_import_template.csv"')
+      .send(csvHeader + sampleRow);
+  },
 };

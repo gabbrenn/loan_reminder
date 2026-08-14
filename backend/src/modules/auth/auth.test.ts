@@ -92,7 +92,7 @@ describe('Auth & Role Module Integration Tests', () => {
     assert.strictEqual(response.statusCode, 400);
     const body = JSON.parse(response.payload);
     assert.ok(body.error);
-    assert.strictEqual(body.error.message, 'Invalid email or password');
+    assert.strictEqual(body.error.message, 'Invalid email, phone, or password');
   });
 
   test('POST /login - should authenticate admin and return token', async () => {

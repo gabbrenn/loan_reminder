@@ -105,7 +105,9 @@ export const ResetPasswordPage: React.FC = () => {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">New Password</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                  New Password <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     id="reset-password"
@@ -137,7 +139,9 @@ export const ResetPasswordPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Confirm New Password</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                  Confirm New Password <span className="text-red-500">*</span>
+                </label>
                 <input
                   id="reset-confirm-password"
                   type={showPwd ? 'text' : 'password'}

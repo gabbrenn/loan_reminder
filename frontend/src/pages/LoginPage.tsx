@@ -61,21 +61,25 @@ export const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Email address</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                Email address or Phone number <span className="text-red-500">*</span>
+              </label>
               <input
                 id="login-email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-[#161b27] border border-slate-200 dark:border-white/[0.08] rounded-md px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 dark:focus:border-blue-500/60 transition-colors"
-                placeholder="admin@loanreminder.com"
+                placeholder="admin@loanreminder.com or +250788123456"
                 required
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Password</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Password <span className="text-red-500">*</span>
+                </label>
                 <a href="/forgot-password" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
                   Forgot password?
                 </a>

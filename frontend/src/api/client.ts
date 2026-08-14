@@ -83,6 +83,27 @@ export const api = {
       request<any>(`/borrowers/${id}`, {
         method: 'DELETE',
       }),
+    import: (borrowers: any[]) =>
+      request<any>('/borrowers/import', {
+        method: 'POST',
+        body: JSON.stringify({ borrowers }),
+      }),
+    downloadTemplate: async () => {
+      const token = localStorage.getItem('jwt_token');
+      const response = await fetch(`${API_PREFIX}/borrowers/template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Failed to download template');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'borrowers_import_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
   },
   loans: {
     list: (filters?: { status?: string; borrowerId?: string; createdById?: string }) => {

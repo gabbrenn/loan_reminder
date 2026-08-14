@@ -262,7 +262,9 @@ export const LoansPage: React.FC = () => {
           {formError && <div className={`${alertError} mb-4`}>{formError}</div>}
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className={labelCls}>Select Borrower</label>
+              <label className={labelCls}>
+                Select Borrower <span className="text-red-500">*</span>
+              </label>
               <select
                 value={borrowerId}
                 onChange={(e) => setBorrowerId(e.target.value)}
@@ -282,7 +284,9 @@ export const LoansPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Principal Amount (RWF)</label>
+                <label className={labelCls}>
+                  Principal Amount (RWF) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="number"
                   min="1"
@@ -294,7 +298,9 @@ export const LoansPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className={labelCls}>Interest Rate (0.1 = 10%)</label>
+                <label className={labelCls}>
+                  Interest Rate (0.1 = 10%) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -310,7 +316,9 @@ export const LoansPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Issued Date</label>
+                <label className={labelCls}>
+                  Issued Date <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={loanDate}
@@ -320,7 +328,9 @@ export const LoansPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className={labelCls}>Maturity Date</label>
+                <label className={labelCls}>
+                  Maturity Date <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={dueDate}
@@ -333,7 +343,9 @@ export const LoansPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Repayment Frequency</label>
+                <label className={labelCls}>
+                  Repayment Frequency <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={frequency}
                   onChange={(e) => setFrequency(e.target.value as any)}

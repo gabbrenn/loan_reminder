@@ -15,26 +15,26 @@ export class AuthService {
     this.authRepository = new AuthRepository();
   }
 
-  async login(email: string, passwordPlain: string) {
-    const user = await this.authRepository.findByEmail(email);
+  async login(identifier: string, passwordPlain: string) {
+    const user = await this.authRepository.findByIdentifier(identifier);
     if (user) {
       const isMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
       if (!isMatch) {
-        throw new Error('Invalid email or password');
+        throw new Error('Invalid email, phone, or password');
       }
       const { passwordHash, ...userWithoutPassword } = user;
       return userWithoutPassword;
     }
 
     // Check borrower table if user not found in users table
-    const borrower = await this.authRepository.findBorrowerByEmail(email);
+    const borrower = await this.authRepository.findBorrowerByIdentifier(identifier);
     if (!borrower || !borrower.passwordHash) {
-      throw new Error('Invalid email or password');
+      throw new Error('Invalid email, phone, or password');
     }
 
     const isMatch = await bcrypt.compare(passwordPlain, borrower.passwordHash);
     if (!isMatch) {
-      throw new Error('Invalid email or password');
+      throw new Error('Invalid email, phone, or password');
     }
 
     return {
@@ -86,9 +86,12 @@ export class AuthService {
     }
 
     if (data.email && data.email !== user.email) {
-      const existing = await this.authRepository.findByEmail(data.email);
-      if (existing) {
-        throw new Error('A user with this email address already exists');
+      const [existingUser, existingBorrower] = await Promise.all([
+        this.authRepository.findByEmail(data.email),
+        this.authRepository.findBorrowerByEmail(data.email),
+      ]);
+      if (existingUser || existingBorrower) {
+        throw new Error('A user or borrower with this email address already exists');
       }
     }
 
@@ -97,15 +100,15 @@ export class AuthService {
 
   // ─── Forgot Password ──────────────────────────────────────────────────────
 
-  async forgotPassword(email: string) {
-    const user = await this.authRepository.findByEmail(email);
+  async forgotPassword(identifier: string) {
+    const user = await this.authRepository.findByIdentifier(identifier);
     let targetUserId = user?.id;
     let targetName = user?.name;
     let targetEmail = user?.email;
     let isBorrower = false;
 
     if (!user) {
-      const borrower = await this.authRepository.findBorrowerByEmail(email);
+      const borrower = await this.authRepository.findBorrowerByIdentifier(identifier);
       if (borrower) {
         targetUserId = borrower.id;
         targetName = borrower.fullName;

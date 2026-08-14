@@ -274,7 +274,9 @@ export const LoanDetailPage: React.FC = () => {
               {formError && <div className={`${alertError} mb-4`}>{formError}</div>}
               <form onSubmit={handleRecordPayment} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div>
-                  <label className={labelCls}>Amount (RWF)</label>
+                  <label className={labelCls}>
+                    Amount (RWF) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     min="1"
@@ -287,7 +289,9 @@ export const LoanDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Payment Date</label>
+                  <label className={labelCls}>
+                    Payment Date <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     value={paymentDate}
@@ -297,7 +301,9 @@ export const LoanDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Method</label>
+                  <label className={labelCls}>
+                    Method <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}

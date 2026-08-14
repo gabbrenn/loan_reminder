@@ -243,13 +243,44 @@ This file tracks the development progress of the MVP according to the build orde
 
 ---
 
-### 23. Reusable Africa's Talking SMS Utility
-- [x] **Created `src/lib/africastalking.ts`**:
-  - Implemented `AfricasTalkingUtility` class and exported singleton `africastalking` instance.
-  - Implemented `sendSMS(to, message, from)` helper function supporting single or array recipient phone numbers.
-  - Automated sandbox vs production base URL switching (`api.sandbox.africastalking.com` vs `api.africastalking.com`).
-  - Added environment variable configuration in `.env` (`AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, `AFRICASTALKING_SENDER_ID`).
-  - Strongly typed request options (`SendSMSOptions`) and response interfaces (`ATSendSMSResponse`, `ATRecipientResult`).
+### 24. Borrower Excel Import & Cross-Table Email Uniqueness Guard
+- [x] **Cross-Table Email Uniqueness Guard**:
+  - `UserService.createUser` & `UserService.updateUser` verify case-insensitive email uniqueness against both `User` and `Borrower` tables (`findFirst` with `mode: 'insensitive'`).
+  - `BorrowerService.createBorrower`, `BorrowerService.updateBorrower`, and `BorrowerService.importBorrowers` verify case-insensitive email uniqueness against both `User` and `Borrower` tables.
+  - Prevents login conflicts between system user accounts and borrower tracking accounts.
+- [x] **Excel / CSV Template Download**:
+  - `GET /api/v1/borrowers/template` returns downloadable `borrowers_import_template.csv` with standard column headers.
+  - Frontend toolbar features a "📥 Template" download button.
+- [x] **Bulk Borrower Import Endpoint**:
+  - `POST /api/v1/borrowers/import` endpoint guarded by `WRITE_ROLES` (`ADMIN`, `LOAN_OFFICER`).
+  - Performs batch uniqueness validation (across batch duplicates and existing DB records for nationalId, phone, and email across both User and Borrower tables).
+  - Hashes default password (`Borrower123!`), logs audit entries, and returns detailed batch results `{ successCount, failureCount, errors, created }`.
+- [x] **Frontend Interactive Excel Import Modal**:
+  - Installed `xlsx` (SheetJS) package in `frontend`.
+  - Added "📤 Import Excel" button to `BorrowersPage.tsx`.
+  - Parses `.xlsx`, `.xls`, `.csv` spreadsheets with dynamic column header mapping.
+  - Interactive preview table showing row numbers, mapped fields, and visual missing field indicators before submitting batch.
+  - Displays summary result banner with itemized row errors.
+- [x] **Integration Tests**:
+  - Added `src/modules/borrower/borrower-import.test.ts` testing template downloads, valid bulk imports, cross-table email rejection, and partial batch failure reporting.
+  - **All 70 backend integration tests passing** across 12 test suites (`70 pass / 0 fail`).
+
+---
+
+### 25. Phone Number Authentication & Borrower Photo File Upload
+- [x] **Phone Number Login & Forgot Password**:
+  - Backend `AuthRepository.findByIdentifier` & `findBorrowerByIdentifier` look up accounts by email (case-insensitive) or phone number.
+  - Updated `AuthService.login` and `AuthService.forgotPassword` to authenticate and dispatch password reset links using either email or phone number.
+  - Updated route schemas in `auth.route.ts` to allow email or phone string inputs.
+  - `LoginPage.tsx` & `ForgotPasswordPage.tsx` updated to accept "Email address or Phone number".
+- [x] **Borrower Profile Photo File Upload**:
+  - Added interactive image file picker (`image/*`) in `BorrowersPage.tsx` modal.
+  - Reads uploaded photo file via `FileReader` to base64 Data URL with live avatar thumbnail preview and clear/change controls.
+- [x] **Red Asterisks (`*`) on Required Input Labels**:
+  - Updated all form modal labels across `LoginPage.tsx`, `ForgotPasswordPage.tsx`, `ResetPasswordPage.tsx`, `BorrowersPage.tsx`, `UsersPage.tsx`, `LoansPage.tsx`, and `LoanDetailPage.tsx` to display a red asterisk `<span className="text-red-500">*</span>` next to required input fields.
+- [x] **Integration Tests**:
+  - Added `src/modules/auth/phone-auth.test.ts` verifying phone login, email login, and forgot password by phone number.
+  - All test suites passing.
 
 
 
