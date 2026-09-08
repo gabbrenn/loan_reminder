@@ -19,7 +19,10 @@ export class AuthRepository {
     const cleanId = identifier.trim();
     return prisma.user.findFirst({
       where: {
-        email: { equals: cleanId.toLowerCase(), mode: 'insensitive' },
+        OR: [
+          { email: { equals: cleanId.toLowerCase(), mode: 'insensitive' } },
+          { phone: { equals: cleanId } },
+        ],
       },
     });
   }
@@ -63,13 +66,14 @@ export class AuthRepository {
   }
 
 
-  async updateProfile(id: string, data: { email?: string; name?: string }) {
+  async updateProfile(id: string, data: { email?: string; name?: string; phone?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,
       select: {
         id: true,
         email: true,
+        phone: true,
         name: true,
         role: true,
         createdAt: true,

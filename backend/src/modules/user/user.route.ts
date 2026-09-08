@@ -21,6 +21,7 @@ export async function userRoutes(fastify: FastifyInstance) {
           properties: {
             email: { type: 'string', format: 'email' },
             name: { type: 'string', minLength: 2 },
+            phone: { type: 'string' },
             password: { type: 'string', minLength: 6 },
             role: { type: 'string', enum: ['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER'] },
           },
@@ -45,6 +46,7 @@ export async function userRoutes(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             name: { type: 'string', minLength: 2 },
+            phone: { type: ['string', 'null'] },
             role: { type: 'string', enum: ['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER'] },
           },
         },

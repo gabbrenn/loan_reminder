@@ -67,6 +67,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           properties: {
             email: { type: 'string', format: 'email' },
             name: { type: 'string', minLength: 2 },
+            phone: { type: ['string', 'null'] },
           },
         },
       },

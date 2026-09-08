@@ -21,6 +21,7 @@ export class AuthController {
         email: user.email,
         role: user.role,
         name: user.name,
+        phone: (user as any).phone || null,
       });
 
       return reply.code(200).send({ user, token });
@@ -56,7 +57,7 @@ export class AuthController {
   };
 
   updateProfile = async (
-    request: FastifyRequest<{ Body: { email?: string; name?: string } }>,
+    request: FastifyRequest<{ Body: { email?: string; name?: string; phone?: string | null } }>,
     reply: FastifyReply
   ) => {
     try {
@@ -72,6 +73,7 @@ export class AuthController {
         email: updatedUser.email,
         role: updatedUser.role,
         name: updatedUser.name,
+        phone: (updatedUser as any).phone || null,
       });
 
       return reply.code(200).send({ user: updatedUser, token });

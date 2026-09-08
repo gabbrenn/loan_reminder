@@ -40,6 +40,22 @@ export class AfricasTalkingUtility {
   }
 
   /**
+   * Normalize a phone number to E.164 +250 format (Rwanda).
+   * Handles:
+   *   07xxxxxxxx  → +25077xxxxxxx  (leading 0 → replace with +250)
+   *   250xxxxxxxx → +250xxxxxxxx   (missing leading +)
+   *   +250xxxxxxxx → unchanged
+   *   078xxxxxxx  → +250078xxxxxxx (bare local, no leading 0 — rare, prepend +250)
+   */
+  private normalizePhone(phone: string): string {
+    const stripped = phone.trim().replace(/\s+/g, '');
+    if (stripped.startsWith('+250')) return stripped;          // already correct
+    if (stripped.startsWith('250')) return `+${stripped}`;    // missing +
+    if (stripped.startsWith('0')) return `+250${stripped.slice(1)}`; // 0XXXXXXXXX
+    return `+250${stripped}`;                                  // bare local digits
+  }
+
+  /**
    * Send SMS via Africa's Talking SMS Gateway API
    * @param options SendSMSOptions including recipient phone number(s) and message string
    */
@@ -49,7 +65,8 @@ export class AfricasTalkingUtility {
       throw new Error("Africa's Talking API key is not configured.");
     }
 
-    const recipients = Array.isArray(options.to) ? options.to.join(',') : options.to;
+    const rawRecipients = Array.isArray(options.to) ? options.to : [options.to];
+    const recipients = rawRecipients.map((n) => this.normalizePhone(n)).join(',');
     const from = options.from || this.senderId;
 
     const params = new URLSearchParams();
@@ -71,6 +88,7 @@ export class AfricasTalkingUtility {
         {
           headers: {
             'apiKey': this.apiKey,
+            'username': this.username,
             'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json',
           },

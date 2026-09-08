@@ -20,6 +20,7 @@ export class UserService {
   async createUser(data: {
     email: string;
     name: string;
+    phone?: string;
     password: string;
     role: Role;
   }) {
@@ -33,15 +34,27 @@ export class UserService {
       throw new Error('A user or borrower with this email address already exists');
     }
 
+    // Phone uniqueness check (cross-table against borrowers too)
+    if (data.phone) {
+      const [userByPhone, borrowerByPhone] = await Promise.all([
+        prisma.user.findFirst({ where: { phone: data.phone } }),
+        prisma.borrower.findFirst({ where: { phone: data.phone } }),
+      ]);
+      if (userByPhone || borrowerByPhone) {
+        throw new Error('A user or borrower with this phone number already exists');
+      }
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
     const user = await this.repo.create({
       email: data.email,
       name: data.name,
+      phone: data.phone,
       passwordHash,
       role: data.role,
     });
 
-    // Send welcome email with a password-reset link so the new user can set their own password
+    // Send welcome email (+ SMS if phone provided) with a password-reset link
     try {
       await authService.sendUserWelcomeEmail(user.id, user.role, data.password);
     } catch (err) {
@@ -51,10 +64,9 @@ export class UserService {
     return user;
   }
 
-
   async updateUser(
     id: string,
-    data: { name?: string; role?: Role },
+    data: { name?: string; role?: Role; phone?: string | null },
     requesterId: string
   ) {
     const user = await this.repo.findById(id);
@@ -63,6 +75,17 @@ export class UserService {
     // Prevent an admin from demoting themselves accidentally
     if (id === requesterId && data.role && data.role !== 'ADMIN') {
       throw new Error('You cannot change your own role');
+    }
+
+    // Phone uniqueness check on update
+    if (data.phone) {
+      const [userByPhone, borrowerByPhone] = await Promise.all([
+        prisma.user.findFirst({ where: { phone: data.phone, NOT: { id } } }),
+        prisma.borrower.findFirst({ where: { phone: data.phone } }),
+      ]);
+      if (userByPhone || borrowerByPhone) {
+        throw new Error('A user or borrower with this phone number already exists');
+      }
     }
 
     return this.repo.update(id, data);

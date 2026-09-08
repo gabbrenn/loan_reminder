@@ -65,7 +65,7 @@ export async function loanRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/export',
     {
-      preHandler: [fastify.authenticate, authorize([...READ_ROLES])],
+      preHandler: [fastify.authenticate, authorize(['ADMIN', 'LOAN_OFFICER', 'CREDIT_MANAGER'])],
       schema: {
         querystring: {
           type: 'object',

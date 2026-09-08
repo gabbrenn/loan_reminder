@@ -4,6 +4,7 @@ import { api } from '../api/client';
 interface User {
   id: string;
   email: string;
+  phone?: string | null;
   role: 'ADMIN' | 'LOAN_OFFICER' | 'CREDIT_MANAGER' | 'BORROWER';
   name: string;
 }
@@ -15,7 +16,7 @@ interface AuthContextType {
   login: (credentials: any) => Promise<void>;
   logout: () => void;
   loading: boolean;
-  updateProfile: (data: { email?: string; name?: string }) => Promise<void>;
+  updateProfile: (data: { email?: string; name?: string; phone?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const updateProfile = async (data: { email?: string; name?: string }) => {
+  const updateProfile = async (data: { email?: string; name?: string; phone?: string }) => {
     const res = await api.auth.updateProfile(data);
     const jwtToken = res.token;
     localStorage.setItem('jwt_token', jwtToken);

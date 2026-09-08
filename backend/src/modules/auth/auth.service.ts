@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { sendEmail } from '../../lib/notify';
 import { emailTemplates } from '../../lib/emailTemplates';
+import { africastalking } from '../../lib/africastalking';
+import prisma from '../../lib/prisma';
 
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
 const RESET_TEMPLATE_ID = process.env.RESET_PASSWORD_TEMPLATE || process.env.REMINDER_TEMPLATE || '';
@@ -79,7 +81,7 @@ export class AuthService {
     return true;
   }
 
-  async updateProfile(userId: string, data: { email?: string; name?: string }) {
+  async updateProfile(userId: string, data: { email?: string; name?: string; phone?: string | null }) {
     const user = await this.authRepository.findById(userId);
     if (!user) {
       throw new Error('User not found');
@@ -95,7 +97,23 @@ export class AuthService {
       }
     }
 
-    return this.authRepository.updateProfile(userId, data);
+    if (data.phone !== undefined && data.phone !== null && data.phone !== user.phone) {
+      const cleanPhone = data.phone.trim();
+      if (cleanPhone) {
+        const [existingUserPhone, existingBorrowerPhone] = await Promise.all([
+          prisma.user.findFirst({ where: { phone: cleanPhone, id: { not: userId } } }),
+          prisma.borrower.findFirst({ where: { phone: cleanPhone } }),
+        ]);
+        if (existingUserPhone || existingBorrowerPhone) {
+          throw new Error('This phone number is already registered to another account');
+        }
+      }
+    }
+
+    return this.authRepository.updateProfile(userId, {
+      ...data,
+      phone: data.phone !== undefined ? (data.phone ? data.phone.trim() : null) : undefined,
+    });
   }
 
   // ─── Forgot Password ──────────────────────────────────────────────────────
@@ -105,6 +123,7 @@ export class AuthService {
     let targetUserId = user?.id;
     let targetName = user?.name;
     let targetEmail = user?.email;
+    let targetPhone = (user as any)?.phone ?? null;
     let isBorrower = false;
 
     if (!user) {
@@ -113,12 +132,13 @@ export class AuthService {
         targetUserId = borrower.id;
         targetName = borrower.fullName;
         targetEmail = borrower.email;
+        targetPhone = borrower.phone ?? null;
         isBorrower = true;
       }
     }
 
-    // Always respond with success even if user/borrower not found — prevents email enumeration
-    if (!targetUserId || !targetEmail || !targetName) return;
+    // Always respond with success even if user/borrower not found — prevents enumeration
+    if (!targetUserId || !targetName || (!targetEmail && !targetPhone)) return;
 
     // Invalidate any previous unused tokens
     await this.authRepository.invalidateUserResetTokens(targetUserId, isBorrower);
@@ -131,14 +151,33 @@ export class AuthService {
 
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
-    // Send email via notify SDK using modern HTML template
-    await sendEmail('EMAIL', targetEmail, {
-      message: emailTemplates.forgotPassword({
-        name: targetName,
-        resetLink,
-        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
-      }),
-    });
+    // Send email via notify SDK using modern HTML template (non-blocking)
+    if (targetEmail) {
+      try {
+        await sendEmail('EMAIL', targetEmail, {
+          message: emailTemplates.forgotPassword({
+            name: targetName,
+            resetLink,
+            expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+          }),
+        });
+      } catch (emailErr) {
+        console.error('[Auth] Forgot-password email dispatch failed:', emailErr);
+      }
+    }
+
+    // Also send SMS if the target has a phone number (short, single-credit format)
+    if (targetPhone) {
+      try {
+        const firstName = targetName.split(' ')[0] || targetName;
+        await africastalking.sendSMS({
+          to: targetPhone,
+          message: `Hi ${firstName}, reset your password: ${resetLink} (valid ${RESET_TOKEN_EXPIRY_MINUTES}m)`,
+        });
+      } catch (smsErr) {
+        console.error('[Auth] Forgot-password SMS dispatch failed:', smsErr);
+      }
+    }
   }
 
   // ─── Welcome Emails for New Accounts ──────────────────────────────────────
@@ -155,16 +194,35 @@ export class AuthService {
     await this.authRepository.createResetToken(userId, false, rawToken, expiresAt);
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
-    await sendEmail('EMAIL', user.email, {
-      message: emailTemplates.userWelcome({
-        name: user.name,
-        email: user.email,
-        role,
-        resetLink,
-        temporaryPassword,
-        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
-      }),
-    });
+    if (user.email) {
+      try {
+        await sendEmail('EMAIL', user.email, {
+          message: emailTemplates.userWelcome({
+            name: user.name,
+            email: user.email,
+            role,
+            resetLink,
+            temporaryPassword,
+            expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+          }),
+        });
+      } catch (emailErr) {
+        console.error('[Auth] User welcome email dispatch failed:', emailErr);
+      }
+    }
+
+    // Short SMS welcome (single-credit format)
+    if ((user as any).phone) {
+      try {
+        const firstName = user.name.split(' ')[0] || user.name;
+        await africastalking.sendSMS({
+          to: (user as any).phone,
+          message: `Welcome ${firstName}! (${role}) Temp pass: ${temporaryPassword}. Login: ${APP_URL}`,
+        });
+      } catch (smsErr) {
+        console.error('[Auth] User welcome SMS dispatch failed:', smsErr);
+      }
+    }
   }
 
   async sendBorrowerWelcomeEmail(borrowerId: string, temporaryPassword: string = 'Borrower123!') {
@@ -179,16 +237,35 @@ export class AuthService {
     await this.authRepository.createResetToken(borrowerId, true, rawToken, expiresAt);
     const resetLink = `${APP_URL}/reset-password?token=${rawToken}`;
 
-    await sendEmail('EMAIL', borrower.email, {
-      message: emailTemplates.borrowerWelcome({
-        name: borrower.fullName,
-        email: borrower.email,
-        role: 'BORROWER',
-        resetLink,
-        temporaryPassword,
-        expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
-      }),
-    });
+    if (borrower.email) {
+      try {
+        await sendEmail('EMAIL', borrower.email, {
+          message: emailTemplates.borrowerWelcome({
+            name: borrower.fullName,
+            email: borrower.email,
+            role: 'BORROWER',
+            resetLink,
+            temporaryPassword,
+            expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+          }),
+        });
+      } catch (emailErr) {
+        console.error('[Auth] Borrower welcome email dispatch failed:', emailErr);
+      }
+    }
+
+    // Short SMS welcome (single-credit format)
+    if (borrower.phone) {
+      try {
+        const firstName = borrower.fullName.split(' ')[0] || borrower.fullName;
+        await africastalking.sendSMS({
+          to: borrower.phone,
+          message: `Welcome ${firstName}! Temp pass: ${temporaryPassword}. Login: ${APP_URL}`,
+        });
+      } catch (smsErr) {
+        console.error('[Auth] Borrower welcome SMS dispatch failed:', smsErr);
+      }
+    }
   }
 
   // ─── Reset Password ───────────────────────────────────────────────────────

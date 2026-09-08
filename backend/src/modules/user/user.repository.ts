@@ -7,6 +7,7 @@ export class UserRepository {
       select: {
         id: true,
         email: true,
+        phone: true,
         name: true,
         role: true,
         createdAt: true,
@@ -22,6 +23,7 @@ export class UserRepository {
       select: {
         id: true,
         email: true,
+        phone: true,
         name: true,
         role: true,
         createdAt: true,
@@ -33,23 +35,28 @@ export class UserRepository {
     return prisma.user.findUnique({ where: { email } });
   }
 
+  async findByPhone(phone: string) {
+    return prisma.user.findUnique({ where: { phone } });
+  }
+
   async create(data: {
     email: string;
     name: string;
+    phone?: string;
     passwordHash: string;
     role: Role;
   }) {
     return prisma.user.create({
       data,
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
+      select: { id: true, email: true, phone: true, name: true, role: true, createdAt: true },
     });
   }
 
-  async update(id: string, data: { name?: string; role?: Role }) {
+  async update(id: string, data: { name?: string; role?: Role; phone?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,
-      select: { id: true, email: true, name: true, role: true, updatedAt: true },
+      select: { id: true, email: true, phone: true, name: true, role: true, updatedAt: true },
     });
   }
 

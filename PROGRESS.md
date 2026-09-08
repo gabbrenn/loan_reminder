@@ -240,6 +240,12 @@ This file tracks the development progress of the MVP according to the build orde
 - Grouped pending notifications by `borrowerId` during reminder engine runs to send 1 combined email and 1 combined SMS per borrower per day.
 - Preserved automated daily cron execution as well as idempotency checks per schedule item.
 - Created reusable Africa's Talking SMS utility in `src/lib/africastalking.ts` (`AfricasTalkingUtility`, `sendSMS`) supporting both single and bulk SMS dispatch via Africa's Talking REST API with configurable environment variables (`AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, `AFRICASTALKING_SENDER_ID`).
+- Africa's Talking SMS fully wired into all notification flows:
+  - **Reminder engine** (`reminder.service.ts`): `processQueue()` SMS branch now calls `africastalking.sendSMS()` directly — previously incorrectly routed through the Notify API.
+  - **Forgot password** (`auth.service.ts`): After email dispatch, also sends reset link via SMS to borrower's phone number (best-effort, non-blocking).
+  - **Borrower welcome** (`auth.service.ts`): After welcome email, also SMS's temp password + login URL to borrower's phone (best-effort, non-blocking).
+  - System users (ADMIN, LOAN_OFFICER, CREDIT_MANAGER) have no phone field in schema — SMS is skipped for them silently.
+  - Headers fixed: both `apiKey` and `username` are now sent in AT request headers as required by the AT API spec.
 
 ---
 
@@ -282,6 +288,52 @@ This file tracks the development progress of the MVP according to the build orde
   - Added `src/modules/auth/phone-auth.test.ts` verifying phone login, email login, and forgot password by phone number.
   - All test suites passing.
 
+---
 
+### 26. Complete Africa's Talking SMS Integration & System User Phone Support
+- [x] **Africa's Talking API Client Protocol Fixes & Prefix Normalization**:
+  - `backend/src/lib/africastalking.ts`:
+    - Updated `sendSMS` to include `username` in request body (`params.append('username', this.username)`) as required by Africa's Talking endpoint spec.
+    - Added required `username` and `apiKey` headers.
+    - Implemented automatic Rwanda phone prefix validation and normalization (`normalizePhone`): automatically formats `07xxxxxxxx`, `250xxxxxxxx`, or bare local digits into the strict E.164 `+250` format.
+- [x] **User Model Phone Field & DB Push**:
+  - Added `phone String? @unique` to `User` model in `schema.prisma`.
+  - Pushed to PostgreSQL database using `prisma db push`.
+- [x] **System User Phone Support Across Backend Layers**:
+  - `UserRepository`: Exposed `phone` in `findAll`, `findById`, `create`, `update`, and added `findByPhone`.
+  - `UserService`: Added cross-table phone uniqueness validation across both `User` and `Borrower` tables.
+  - `UserController` & `UserRoute`: Added `phone` validation schemas for create (`POST /api/v1/users`) and edit (`PATCH /api/v1/users/:id`).
+  - `AuthRepository` & `AuthService`:
+    - `findByIdentifier`: System users can now log in via their phone number or email.
+    - `sendUserWelcomeEmail`: Automatically sends an SMS welcome message with temporary password & login URL if the user has a phone number.
+    - `forgotPassword`: Sends SMS password reset link to system users (Admin, Loan Officer, Credit Manager) when their phone number is registered.
+    - `updateProfile`: Allows users to update their own phone number with cross-table uniqueness enforcement.
+  - `AuthController`: Injects `phone` into signed JWT payloads on login and profile updates.
+- [x] **SMS Integration Across Services**:
+  - `reminder.service.ts`: Verified and fixed Africa's Talking SMS dispatch in `processQueue()` for loan reminder schedules.
+  - `repayment.service.ts`: Added instant SMS payment receipt dispatch to borrowers upon recording loan payments (contingent on system SMS toggle).
+- [x] **Frontend User & Profile Management**:
+  - `UsersPage.tsx`: Added Phone Number input field in user modal, added Phone column to the user management table, and fixed `finally` block syntax.
+  - `SettingsPage.tsx`: Added Phone Number input field in Admin Profile Settings form.
+  - `AuthContext.tsx` & `api/client.ts`: Added `phone` to `User` model interface and `updateProfile` API call.
+- [x] **Automated Verification**:
+  - Frontend compiled cleanly with `tsc -b && vite build`.
+  - Backend compiled cleanly with `tsc`.
+  - All **73 integration tests passing across 13 test suites** (`73 pass / 0 fail`).
 
+---
+
+### 27. Borrower Dashboard Protections & Short Form SMS Formatting
+- [x] **Borrower Dashboard & Export Protection**:
+  - `DashboardPage.tsx`: Hidden "Total Borrowers" stat card for borrower accounts (`user?.role === 'BORROWER'`). Dynamic responsive grid automatically adjusts from 6 to 5 columns.
+  - `LoansPage.tsx`: Hidden "Export CSV" button for borrowers.
+  - `loan.route.ts`: `/api/v1/loans/export` route guarded to staff roles only (`ADMIN`, `LOAN_OFFICER`, `CREDIT_MANAGER`).
+- [x] **Concise Single-Credit SMS Messaging**:
+  - `auth.service.ts`:
+    - **Borrower welcome SMS**: Shortened from lengthy paragraph to single-credit format: `Welcome ${firstName}! Temp pass: ${temporaryPassword}. Login: ${APP_URL}` (~68 chars).
+    - **User welcome SMS**: Shortened to `Welcome ${firstName}! (${role}) Temp pass: ${temporaryPassword}. Login: ${APP_URL}`.
+    - **Forgot password SMS**: Shortened to `Hi ${firstName}, reset your password: ${resetLink} (valid ${RESET_TOKEN_EXPIRY_MINUTES}m)`.
+- [x] **Forgot Password SMS Reliability via Phone**:
+  - Removed dependency on `targetEmail` for triggering password resets — users identifying by phone number without email now successfully trigger and receive the SMS reset link.
+  - Email delivery failures now wrapped non-blocking in try/catch so SMS delivery is never prevented.
 

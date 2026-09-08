@@ -42,7 +42,7 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<any | null>(null);
-  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'LOAN_OFFICER' });
+  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '', role: 'LOAN_OFFICER' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export default function UsersPage() {
       setError('');
     } catch (e: any) {
       setError(e.message);
-    } finaly: {
+    } finally {
       setLoading(false);
     }
   };
@@ -65,14 +65,14 @@ export default function UsersPage() {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', name: '', password: '', role: 'LOAN_OFFICER' });
+    setForm({ email: '', name: '', phone: '', password: '', role: 'LOAN_OFFICER' });
     setFormError('');
     setShowModal(true);
   };
 
   const openEdit = (u: any) => {
     setEditUser(u);
-    setForm({ email: u.email, name: u.name, password: '', role: u.role });
+    setForm({ email: u.email, name: u.name, phone: u.phone || '', password: '', role: u.role });
     setFormError('');
     setShowModal(true);
   };
@@ -83,11 +83,16 @@ export default function UsersPage() {
     setFormError('');
     try {
       if (editUser) {
-        await api.users.update(editUser.id, { name: form.name, role: form.role });
+        await api.users.update(editUser.id, {
+          name: form.name,
+          phone: form.phone ? form.phone.trim() : null,
+          role: form.role,
+        });
       } else {
         await api.users.create({
           email: form.email,
           name: form.name,
+          phone: form.phone ? form.phone.trim() : undefined,
           password: form.password,
           role: form.role,
         });
@@ -144,6 +149,7 @@ export default function UsersPage() {
               <tr className={theadRow}>
                 <th className={thCls}>Name</th>
                 <th className={thCls}>Email</th>
+                <th className={thCls}>Phone</th>
                 <th className={thCls}>Role</th>
                 <th className={`${thCls} hidden sm:table-cell`}>Created</th>
                 <th className={`${thCls} text-right`}>Actions</th>
@@ -174,6 +180,7 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className={`${tdCls} text-slate-500 dark:text-slate-400 text-xs`}>{u.email}</td>
+                    <td className={`${tdCls} text-slate-500 dark:text-slate-400 text-xs font-mono`}>{u.phone || '—'}</td>
                     <td className={tdCls}>
                       <span className={`${badgeBase} ${roleInfo.cls}`}>{roleInfo.label}</span>
                     </td>
@@ -220,6 +227,18 @@ export default function UsersPage() {
                 required
                 className={inputCls}
                 placeholder="Jane Doe"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>
+                Phone Number <span className="text-xs text-slate-400 font-normal">(Optional, for SMS alerts)</span>
+              </label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className={inputCls}
+                placeholder="+250 780 000 000"
               />
             </div>
             {!editUser && (

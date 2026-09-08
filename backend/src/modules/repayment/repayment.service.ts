@@ -2,8 +2,11 @@ import { RepaymentRepository, ScheduleUpdateInput } from './repayment.repository
 import prisma from '../../lib/prisma';
 import { LoanStatus, PaymentMethod } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../settings/settings.service';
+import { africastalking } from '../../lib/africastalking';
 
 const auditService = new AuditService();
+const settingsService = new SettingsService();
 
 export class RepaymentService {
   private repo: RepaymentRepository;
@@ -19,10 +22,11 @@ export class RepaymentService {
     paymentMethod: PaymentMethod;
     actorId?: string;
   }) {
-    // 1. Fetch Loan with schedules
+    // 1. Fetch Loan with schedules and borrower details
     const loan = await prisma.loan.findUnique({
       where: { id: data.loanId },
       include: {
+        borrower: true,
         repaymentSchedules: {
           orderBy: { installmentNumber: 'asc' },
         },
@@ -103,6 +107,22 @@ export class RepaymentService {
       if (data.actorId) {
         await auditService.log(data.actorId, 'PAYMENT', 'LOAN_REPAYMENT', data.loanId).catch(() => {});
       }
+
+      // Send SMS payment receipt to borrower if SMS is enabled and phone is available
+      if (loan.borrower?.phone) {
+        try {
+          const settings = await settingsService.getSettings();
+          if (settings.smsEnabled) {
+            await africastalking.sendSMS({
+              to: loan.borrower.phone,
+              message: `Payment received: ${amountToApply.toLocaleString()} RWF for loan #${loan.loanNumber}. Remaining balance: ${newRemainingBalance.toLocaleString()} RWF. Thank you!`,
+            });
+          }
+        } catch (smsErr) {
+          console.error('[Repayment] SMS receipt dispatch failed:', smsErr);
+        }
+      }
+
       return result;
     });
   }

@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { SettingsService } from '../settings/settings.service';
 import { sendEmail } from '../../lib/notify';
 import { emailTemplates } from '../../lib/emailTemplates';
+import { africastalking } from '../../lib/africastalking';
 
 const settingsService = new SettingsService();
 
@@ -360,12 +361,13 @@ export class ReminderService {
       }
     }
 
-    // Process SMS dispatch (1 physical send per recipient phone)
+    // Process SMS dispatch (1 physical send per recipient phone) via Africa's Talking
     for (const [phone, logs] of smsGroupMap.entries()) {
       if (settings.smsEnabled) {
         const primaryLog = logs[0];
         try {
-          await sendEmail('SMS', phone, {
+          await africastalking.sendSMS({
+            to: phone,
             message: primaryLog.message || '',
           });
 

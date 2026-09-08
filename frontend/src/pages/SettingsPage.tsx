@@ -46,6 +46,7 @@ export default function SettingsPage() {
   // Profile states
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [profileName, setProfileName] = useState(user?.name || '');
+  const [profilePhone, setProfilePhone] = useState(user?.phone || '');
   const [profileSubmitting, setProfileSubmitting] = useState(false);
 
   const fetchSettings = async () => {
@@ -64,6 +65,14 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      setProfileEmail(user.email || '');
+      setProfileName(user.name || '');
+      setProfilePhone(user.phone || '');
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +106,7 @@ export default function SettingsPage() {
       await updateProfile({
         email: profileEmail,
         name: profileName,
+        phone: profilePhone.trim() || undefined,
       });
       setSuccess('Profile updated successfully.');
       setTimeout(() => setSuccess(''), 4000);
@@ -132,7 +142,7 @@ export default function SettingsPage() {
         <div className="bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-md p-5">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5">Admin Profile Settings</h3>
           <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
-            Update your account details (Name and Email address)
+            Update your account details (Name, Email address, and Phone number for SMS alerts)
           </p>
           <div className="space-y-4">
             <div>
@@ -153,6 +163,16 @@ export default function SettingsPage() {
                 value={profileEmail}
                 onChange={(e) => setProfileEmail(e.target.value)}
                 className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Phone Number <span className="text-xs text-slate-400 font-normal">(for SMS alerts)</span></label>
+              <input
+                type="tel"
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+                className={inputCls}
+                placeholder="+250 780 000 000"
               />
             </div>
           </div>

@@ -11,7 +11,7 @@ export class UserController {
 
   async create(
     request: FastifyRequest<{
-      Body: { email: string; name: string; password: string; role: string };
+      Body: { email: string; name: string; phone?: string; password: string; role: string };
     }>,
     reply: FastifyReply
   ) {
@@ -27,7 +27,7 @@ export class UserController {
   async update(
     request: FastifyRequest<{
       Params: { id: string };
-      Body: { name?: string; role?: string };
+      Body: { name?: string; role?: string; phone?: string | null };
     }>,
     reply: FastifyReply
   ) {
